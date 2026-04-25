@@ -5,7 +5,7 @@
     conversationItem: 'a[data-test-id="conversation"]'
   };
 
-  let checkedConversations = new Set();
+  let checkedConversationIds = new Set(); // 用 conversationId 存储选中状态
   let actionBar = null;
   let apiState = null; // { at, notebookPath, bodyTemplate }
 
@@ -47,7 +47,7 @@
   }
 
   function updateCount() {
-    const count = checkedConversations.size;
+    const count = checkedConversationIds.size;
     injectActionBar();
     const countEl = actionBar.querySelector('.gemling-count');
 
@@ -71,7 +71,7 @@
     statusEl.className = 'gemling-status';
 
     // 按钮始终可用（只要有选中项）
-    btn.disabled = checkedConversations.size === 0;
+    btn.disabled = checkedConversationIds.size === 0;
   }
 
   function observeConversationList() {
@@ -99,9 +99,18 @@
   function injectCheckbox(item) {
     if (item.querySelector('.gemling-checkbox')) return;
 
+    const convId = getConversationId(item);
+    if (!convId) return;
+
     const checkbox = document.createElement('div');
     checkbox.className = 'gemling-checkbox';
     checkbox.dataset.checked = 'false';
+    checkbox.dataset.convId = convId;
+
+    // 恢复选中状态
+    if (checkedConversationIds.has(convId)) {
+      checkbox.dataset.checked = 'true';
+    }
 
     checkbox.addEventListener('mousedown', (e) => {
       e.stopPropagation();
@@ -116,9 +125,9 @@
       checkbox.dataset.checked = isChecked ? 'false' : 'true';
 
       if (!isChecked) {
-        checkedConversations.add(item);
+        checkedConversationIds.add(convId);
       } else {
-        checkedConversations.delete(item);
+        checkedConversationIds.delete(convId);
       }
       updateCount();
     });
@@ -142,53 +151,43 @@
     const btn = actionBar.querySelector('.gemling-btn');
     btn.disabled = true;
 
-    let skipFirst = false;
+    // 清除旧的 API 状态，确保等待新的笔记本选择
+    apiState = null;
 
-    // 如果 API 未捕获，先触发第一个对话项的三点菜单
-    if (!apiState) {
-      const firstItem = checkedConversations.values().next().value;
-      if (!firstItem) {
-        btn.disabled = false;
-        return;
-      }
-
-      btn.textContent = '请手动添加一次...';
-      triggerNativeAddToNotebook(firstItem);
-
-      // 等待 API 捕获（最多等待 30 秒）
-      const captured = await waitForApiCapture(30000);
-      if (!captured) {
-        btn.textContent = '添加到笔记本';
-        btn.disabled = false;
-        return;
-      }
-
-      // 第一个对话已被手动添加，标记跳过
-      skipFirst = true;
+    // 获取第一个选中的对话项
+    const firstConvId = checkedConversationIds.values().next().value;
+    if (!firstConvId) {
+      btn.disabled = false;
+      return;
     }
 
-    // API 已捕获，批量处理
-    const conversations = Array.from(checkedConversations);
-    let successCount = 0;
+    const firstItem = findConversationItem(firstConvId);
+    if (!firstItem) {
+      console.error('[Gemling] 未找到对话项:', firstConvId);
+      btn.disabled = false;
+      return;
+    }
+
+    btn.textContent = '请选择笔记本...';
+    triggerNativeAddToNotebook(firstItem);
+
+    // 等待 API 捕获（最多等待 30 秒）
+    const captured = await waitForApiCapture(30000);
+    if (!captured) {
+      btn.textContent = '添加到笔记本';
+      btn.disabled = false;
+      return;
+    }
+
+    // API 已捕获（用户已选择笔记本），批量处理所有选中的对话
+    const convIds = Array.from(checkedConversationIds);
+    let successCount = 1; // 第一个已通过手动添加成功
     let failCount = 0;
 
-    for (let i = 0; i < conversations.length; i++) {
-      const item = conversations[i];
-
-      // 跳过第一个（已手动添加）
-      if (skipFirst && i === 0) {
-        successCount++;
-        continue;
-      }
-
-      const convId = getConversationId(item);
-      btn.textContent = `处理中 ${i + 1}/${conversations.length}`;
-
-      if (!convId) {
-        console.error('[Gemling] 无法获取对话 ID:', item);
-        failCount++;
-        continue;
-      }
+    // 从第二个开始批量处理（第一个已手动添加）
+    for (let i = 1; i < convIds.length; i++) {
+      const convId = convIds[i];
+      btn.textContent = `处理中 ${i + 1}/${convIds.length}`;
 
       try {
         await addToNotebookViaApi(convId);
@@ -207,9 +206,21 @@
     btn.textContent = '添加到笔记本';
     btn.disabled = false;
 
-    checkedConversations.clear();
+    checkedConversationIds.clear();
     document.querySelectorAll('.gemling-checkbox').forEach(cb => cb.dataset.checked = 'false');
     updateCount();
+  }
+
+  function findConversationItem(convId) {
+    // 根据 conversationId 查找对应的对话项 DOM 元素
+    const items = document.querySelectorAll(SELECTORS.conversationItem);
+    for (const item of items) {
+      const itemConvId = getConversationId(item);
+      if (itemConvId === convId) {
+        return item;
+      }
+    }
+    return null;
   }
 
   function triggerNativeAddToNotebook(item) {
