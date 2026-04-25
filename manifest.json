@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "Gemling",
+  "version": "1.0.0",
+  "description": "批量归档 Google Gemini 对话到笔记本",
+  "permissions": [],
+  "content_scripts": [
+    {
+      "matches": ["https://gemini.google.com/*"],
+      "js": ["content.js"],
+      "css": ["styles.css"],
+      "run_at": "document_end"
+    },
+    {
+      "matches": ["https://gemini.google.com/*"],
+      "js": ["probe.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    }
+  ]
+}
