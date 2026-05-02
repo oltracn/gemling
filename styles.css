@@ -84,6 +84,19 @@
   cursor: not-allowed;
 }
 
+.gemling-btn-delete {
+  background: #ef4444;
+  color: #fafafa;
+}
+
+.gemling-btn-delete:hover {
+  background: #dc2626;
+}
+
+.gemling-btn-delete:disabled {
+  background: #fca5a5;
+}
+
 .gemling-status {
   font-size: 12px;
   color: #71717a;
