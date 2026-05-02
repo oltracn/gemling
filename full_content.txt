@@ -53,8 +53,7 @@
 
     countEl.textContent = `已选中 ${count} 项`;
 
-    const btn = actionBar.querySelector('.gemling-btn');
-    if (count > 0 || btn.dataset.state === 'finished') {
+    if (count > 0) {
       actionBar.classList.remove('gemling-action-bar-hidden');
     } else {
       actionBar.classList.add('gemling-action-bar-hidden');
@@ -71,12 +70,8 @@
     statusEl.textContent = '';
     statusEl.className = 'gemling-status';
 
-    if (btn.dataset.state === 'finished') {
-      btn.disabled = false;
-    } else {
-      // 按钮始终可用（只要有选中项）
-      btn.disabled = checkedConversationIds.size === 0;
-    }
+    // 按钮始终可用（只要有选中项）
+    btn.disabled = checkedConversationIds.size === 0;
   }
 
   function observeConversationList() {
@@ -134,13 +129,6 @@
       } else {
         checkedConversationIds.delete(convId);
       }
-
-      const btn = actionBar?.querySelector('.gemling-btn');
-      if (btn && btn.dataset.state === 'finished') {
-        btn.dataset.state = '';
-        btn.textContent = '添加到笔记本';
-      }
-
       updateCount();
     });
 
@@ -161,15 +149,6 @@
 
   async function handleBulkAddToNotebook() {
     const btn = actionBar.querySelector('.gemling-btn');
-    if (btn.dataset.state === 'finished') {
-      btn.dataset.state = '';
-      btn.textContent = '添加到笔记本';
-      checkedConversationIds.clear();
-      document.querySelectorAll('.gemling-checkbox').forEach(cb => cb.dataset.checked = 'false');
-      updateCount();
-      return;
-    }
-
     btn.disabled = true;
 
     // 清除旧的 API 状态，确保等待新的笔记本选择
@@ -200,33 +179,19 @@
       return;
     }
 
-    // API 已捕获（用户已选择笔记本），第一个对话已通过手动添加成功
-    // 从 DOM 中移除该对话并从 checkedConversationIds 中删除
-    const firstItemParent = firstItem.closest('li') || firstItem.parentElement;
-    if (firstItemParent) firstItemParent.remove();
-    checkedConversationIds.delete(firstConvId);
-
-    // 批量处理所有选中的对话
+    // API 已捕获（用户已选择笔记本），批量处理所有选中的对话
     const convIds = Array.from(checkedConversationIds);
-    let successCount = 1;
+    let successCount = 1; // 第一个已通过手动添加成功
     let failCount = 0;
 
-    // 处理剩下的对话
-    for (let i = 0; i < convIds.length; i++) {
+    // 从第二个开始批量处理（第一个已手动添加）
+    for (let i = 1; i < convIds.length; i++) {
       const convId = convIds[i];
-      // 进度显示考虑上第一个已成功的
-      btn.textContent = `处理中 ${i + 2}/${convIds.length + 1}`;
+      btn.textContent = `处理中 ${i + 1}/${convIds.length}`;
 
       try {
         await addToNotebookViaApi(convId);
         successCount++;
-        // 从 DOM 中移除该对话并从 checkedConversationIds 中删除
-        const item = findConversationItem(convId);
-        if (item) {
-          const itemParent = item.closest('li') || item.parentElement;
-          if (itemParent) itemParent.remove();
-        }
-        checkedConversationIds.delete(convId);
       } catch (err) {
         console.error('[Gemling] 添加失败:', convId, err);
         failCount++;
@@ -235,9 +200,14 @@
       await delay(800);
     }
 
-    btn.textContent = `完成 (成功${successCount}项${failCount > 0 ? `，失败${failCount}项` : ''})`;
-    btn.dataset.state = 'finished';
+    btn.textContent = `完成 ${successCount}项${failCount > 0 ? `，失败${failCount}项` : ''}`;
+    await delay(2000);
+
+    btn.textContent = '添加到笔记本';
     btn.disabled = false;
+
+    checkedConversationIds.clear();
+    document.querySelectorAll('.gemling-checkbox').forEach(cb => cb.dataset.checked = 'false');
     updateCount();
   }
 
