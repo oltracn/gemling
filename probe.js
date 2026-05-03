@@ -1,5 +1,5 @@
 (function() {
-  // 拦截 XHR 以捕获 MUAZcd (添加到笔记本) 请求
+  // 拦截 XHR 以捕获 MUAZcd (添加到笔记本) 和其他 API 请求 (如删除)
   const originalOpen = XMLHttpRequest.prototype.open;
   const originalSend = XMLHttpRequest.prototype.send;
 
@@ -10,31 +10,41 @@
   };
 
   XMLHttpRequest.prototype.send = function(body) {
-    if (this._gemlingMethod?.toUpperCase() === 'POST' && this._gemlingUrl.includes('MUAZcd')) {
+    if (this._gemlingMethod?.toUpperCase() === 'POST' && this._gemlingUrl.includes('batchexecute')) {
       try {
         const bodyText = typeof body === 'string' ? body : '';
-        const fReq = new URLSearchParams(bodyText).get('f.req');
-        const at = new URLSearchParams(bodyText).get('at');
+        const urlMatch = this._gemlingUrl.match(/source-path=([^&]+)/);
+        const sourcePathRaw = urlMatch ? urlMatch[1] : '';
 
-        if (fReq && at) {
-          const parsed = JSON.parse(fReq);
-          const innerStr = parsed[0][0][1]; // "[null,[...],["conv_id",...,null,null,null,"notebooks/...",...]]"
-          const inner = JSON.parse(innerStr);
-          const notebookPath = inner[2][7]; // "notebooks/xxxx"
-          const convId = inner[2][0]; // "c_xxxx"
+        if (this._gemlingUrl.includes('MUAZcd')) {
+          const fReq = new URLSearchParams(bodyText).get('f.req');
+          const at = new URLSearchParams(bodyText).get('at');
 
-          // 提取 source-path 原始值（不解码）
-          const urlMatch = this._gemlingUrl.match(/source-path=([^&]+)/);
-          const sourcePathRaw = urlMatch ? urlMatch[1] : '';
+          if (fReq && at) {
+            const parsed = JSON.parse(fReq);
+            const innerStr = parsed[0][0][1];
+            const inner = JSON.parse(innerStr);
+            const notebookPath = inner[2][7];
+            const convId = inner[2][0];
 
-          window.dispatchEvent(new CustomEvent('gemling-api-captured', {
+            window.dispatchEvent(new CustomEvent('gemling-api-captured', {
+              detail: {
+                url: this._gemlingUrl,
+                sourcePathRaw: sourcePathRaw,
+                at: at,
+                notebookPath: notebookPath,
+                convId: convId,
+                fReqTemplate: innerStr,
+                bodyTemplate: bodyText
+              }
+            }));
+          }
+        } else {
+          // 其他 batchexecute 请求，原样抛出，用于未知的 API (如删除)
+          window.dispatchEvent(new CustomEvent('gemling-api-captured-raw', {
             detail: {
               url: this._gemlingUrl,
               sourcePathRaw: sourcePathRaw,
-              at: at,
-              notebookPath: notebookPath,
-              convId: convId,
-              fReqTemplate: innerStr,
               bodyTemplate: bodyText
             }
           }));

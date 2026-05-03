@@ -1,10 +1,58 @@
 {
-  "extName": { "message": "Gemling - Gerenciador em lote Gemini" },
-  "extDesc": { "message": "Gerencie conversas do Google Gemini em lote, incluindo mover vários chats para um caderno com um clique." },
-  "actionAdd": { "message": "Adicionar ao caderno" },
-  "actionSelect": { "message": "Selecione o caderno..." },
-  "actionProcessing": { "message": "Processando $CURRENT$/$TOTAL$", "placeholders": { "CURRENT": { "content": "$1" }, "TOTAL": { "content": "$2" } } },
-  "actionDone": { "message": "Concluído ($SUCCESS$ com sucesso$FAIL_MSG$)", "placeholders": { "SUCCESS": { "content": "$1" }, "FAIL_MSG": { "content": "$2" } } },
-  "actionFailMsg": { "message": ", $FAIL$ falharam", "placeholders": { "FAIL": { "content": "$1" } } },
-  "countSelected": { "message": "$COUNT$ selecionado(s)", "placeholders": { "COUNT": { "content": "$1" } } }
+  "extName": {
+    "message": "Gemling - Gerenciador em lote Gemini"
+  },
+  "extDesc": {
+    "message": "Gerencie conversas do Google Gemini em lote, incluindo mover vários chats para um caderno com um clique."
+  },
+  "actionAdd": {
+    "message": "Adicionar ao caderno"
+  },
+  "actionSelect": {
+    "message": "Selecione o caderno..."
+  },
+  "actionProcessing": {
+    "message": "Processando $CURRENT$/$TOTAL$",
+    "placeholders": {
+      "CURRENT": {
+        "content": "$1"
+      },
+      "TOTAL": {
+        "content": "$2"
+      }
+    }
+  },
+  "actionDone": {
+    "message": "Concluído ($SUCCESS$ com sucesso$FAIL_MSG$)",
+    "placeholders": {
+      "SUCCESS": {
+        "content": "$1"
+      },
+      "FAIL_MSG": {
+        "content": "$2"
+      }
+    }
+  },
+  "actionFailMsg": {
+    "message": ", $FAIL$ falharam",
+    "placeholders": {
+      "FAIL": {
+        "content": "$1"
+      }
+    }
+  },
+  "countSelected": {
+    "message": "$COUNT$ selecionado(s)",
+    "placeholders": {
+      "COUNT": {
+        "content": "$1"
+      }
+    }
+  },
+  "actionDelete": {
+    "message": "Delete"
+  },
+  "actionCancel": {
+    "message": "Cancel"
+  }
 }
