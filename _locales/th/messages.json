@@ -1,0 +1,10 @@
+{
+  "extName": { "message": "Gemling - ตัวจัดการ Gemini แบบชุด" },
+  "extDesc": { "message": "จัดการการสนทนา Google Gemini แบบชุด เช่น การย้ายหลายแชทไปยังสมุดบันทึกในคลิกเดียว" },
+  "actionAdd": { "message": "เพิ่มไปยังสมุดบันทึก" },
+  "actionSelect": { "message": "โปรดเลือกสมุดบันทึก..." },
+  "actionProcessing": { "message": "กำลังประมวลผล $CURRENT$/$TOTAL$", "placeholders": { "CURRENT": { "content": "$1" }, "TOTAL": { "content": "$2" } } },
+  "actionDone": { "message": "เสร็จสิ้น (สำเร็จ $SUCCESS$ รายการ$FAIL_MSG$)", "placeholders": { "SUCCESS": { "content": "$1" }, "FAIL_MSG": { "content": "$2" } } },
+  "actionFailMsg": { "message": ", ล้มเหลว $FAIL$ รายการ", "placeholders": { "FAIL": { "content": "$1" } } },
+  "countSelected": { "message": "เลือก $COUNT$ รายการ", "placeholders": { "COUNT": { "content": "$1" } } }
+}

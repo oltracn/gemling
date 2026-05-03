@@ -49,12 +49,15 @@
 
     actionBar = document.createElement('div');
     actionBar.className = 'gemling-action-bar gemling-action-bar-hidden';
+
+    // 初始化国际化文本
+    const selectedText = chrome.i18n.getMessage("countSelected", ["0"]);
+    const addText = chrome.i18n.getMessage("actionAdd");
+
     actionBar.innerHTML = `
-      <span class="gemling-count">已选中 0 项</span>
+      <span class="gemling-count">${selectedText}</span>
       <span class="gemling-status"></span>
-      <button class="gemling-btn gemling-btn-cancel">取消</button>
-      <button class="gemling-btn gemling-btn-add" disabled>添加到笔记本</button>
-      <button class="gemling-btn gemling-btn-delete" disabled>删除</button>
+      <button class="gemling-btn" disabled>${addText}</button>
     `;
 
     document.body.appendChild(actionBar);
@@ -74,7 +77,7 @@
     injectActionBar();
     const countEl = actionBar.querySelector('.gemling-count');
 
-    countEl.textContent = `已选中 ${count} 项`;
+    countEl.textContent = chrome.i18n.getMessage("countSelected", [count.toString()]);
 
     const btnAdd = actionBar.querySelector('.gemling-btn-add');
     const btnDelete = actionBar.querySelector('.gemling-btn-delete');
@@ -167,17 +170,10 @@
         checkedConversationIds.delete(convId);
       }
 
-      if (actionBar) {
-        const btnAdd = actionBar.querySelector('.gemling-btn-add');
-        if (btnAdd && btnAdd.dataset.state === 'finished') {
-          btnAdd.dataset.state = '';
-          btnAdd.textContent = '添加到笔记本';
-        }
-        const btnDelete = actionBar.querySelector('.gemling-btn-delete');
-        if (btnDelete && btnDelete.dataset.state === 'finished') {
-          btnDelete.dataset.state = '';
-          btnDelete.textContent = '删除';
-        }
+      const btn = actionBar?.querySelector('.gemling-btn');
+      if (btn && btn.dataset.state === 'finished') {
+        btn.dataset.state = '';
+        btn.textContent = chrome.i18n.getMessage("actionAdd");
       }
 
       updateCount();
@@ -221,21 +217,12 @@
   }
 
   async function handleBulkAddToNotebook() {
-    await executeBulkAction('add');
-  }
-
-  async function handleBulkDelete() {
-    await executeBulkAction('delete');
-  }
-
-  async function executeBulkAction(actionType) {
-    const isAdd = actionType === 'add';
-    const btnSelector = isAdd ? '.gemling-btn-add' : '.gemling-btn-delete';
-    const btn = actionBar.querySelector(btnSelector);
+    const btn = actionBar.querySelector('.gemling-btn');
+    const actionAddText = chrome.i18n.getMessage("actionAdd");
 
     if (btn.dataset.state === 'finished') {
       btn.dataset.state = '';
-      btn.textContent = isAdd ? '添加到笔记本' : '删除';
+      btn.textContent = actionAddText;
       checkedConversationIds.clear();
       document.querySelectorAll('.gemling-checkbox').forEach(cb => cb.dataset.checked = 'false');
       updateCount();
@@ -263,21 +250,14 @@
       return;
     }
 
-    targetCaptureConvId = normalizeConversationId(firstConvId);
-
-    if (isAdd) {
-      btn.textContent = '请选择笔记本...';
-      triggerNativeMenuAction(firstItem, ['笔记本', 'notebook', 'Notebook', 'Save', 'save', 'Add']);
-    } else {
-      btn.textContent = '请确认删除...';
-      triggerNativeMenuAction(firstItem, ['删除', 'Delete', 'delete']);
-    }
+    btn.textContent = chrome.i18n.getMessage("actionSelect");
+    triggerNativeAddToNotebook(firstItem);
 
     // 等待 API 捕获
     const captured = await waitForApiCapture(30000, !isAdd);
     if (!captured) {
-      btn.textContent = isAdd ? '添加到笔记本' : '删除';
-      updateButtonState();
+      btn.textContent = actionAddText;
+      btn.disabled = false;
       return;
     }
 
@@ -291,7 +271,10 @@
 
     for (let i = 0; i < convIds.length; i++) {
       const convId = convIds[i];
-      btn.textContent = `处理中 ${i + 2}/${convIds.length + 1}`;
+      // 进度显示考虑上第一个已成功的
+      const current = (i + 2).toString();
+      const total = (convIds.length + 1).toString();
+      btn.textContent = chrome.i18n.getMessage("actionProcessing", [current, total]);
 
       try {
         await executeActionViaApi(convId);
@@ -306,7 +289,8 @@
       await delay(800);
     }
 
-    btn.textContent = `完成 (成功${successCount}项${failCount > 0 ? `，失败${failCount}项` : ''})`;
+    const failMsg = failCount > 0 ? chrome.i18n.getMessage("actionFailMsg", [failCount.toString()]) : '';
+    btn.textContent = chrome.i18n.getMessage("actionDone", [successCount.toString(), failMsg]);
     btn.dataset.state = 'finished';
     btn.disabled = false;
     updateCount();
