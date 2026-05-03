@@ -10,34 +10,35 @@
   };
 
   XMLHttpRequest.prototype.send = function(body) {
-    if (this._gemlingMethod?.toUpperCase() === 'POST' && this._gemlingUrl.includes('MUAZcd')) {
+    if (this._gemlingMethod?.toUpperCase() === 'POST' && this._gemlingUrl.includes('batchexecute')) {
       try {
         const bodyText = typeof body === 'string' ? body : '';
-        const fReq = new URLSearchParams(bodyText).get('f.req');
-        const at = new URLSearchParams(bodyText).get('at');
+        const params = new URLSearchParams(bodyText);
+        const fReq = params.get('f.req');
+        const at = params.get('at');
 
         if (fReq && at) {
           const parsed = JSON.parse(fReq);
-          const innerStr = parsed[0][0][1]; // "[null,[...],["conv_id",...,null,null,null,"notebooks/...",...]]"
-          const inner = JSON.parse(innerStr);
-          const notebookPath = inner[2][7]; // "notebooks/xxxx"
-          const convId = inner[2][0]; // "c_xxxx"
+          // 预期格式为 [ [ [ "rpcId", "innerPayloadString", ... ] ] ]
+          if (parsed && parsed[0] && parsed[0][0]) {
+            const rpcId = parsed[0][0][0];
+            const innerStr = parsed[0][0][1];
 
-          // 提取 source-path 原始值（不解码）
-          const urlMatch = this._gemlingUrl.match(/source-path=([^&]+)/);
-          const sourcePathRaw = urlMatch ? urlMatch[1] : '';
+            // 提取 source-path 原始值（不解码）
+            const urlMatch = this._gemlingUrl.match(/source-path=([^&]+)/);
+            const sourcePathRaw = urlMatch ? urlMatch[1] : '';
 
-          window.dispatchEvent(new CustomEvent('gemling-api-captured', {
-            detail: {
-              url: this._gemlingUrl,
-              sourcePathRaw: sourcePathRaw,
-              at: at,
-              notebookPath: notebookPath,
-              convId: convId,
-              fReqTemplate: innerStr,
-              bodyTemplate: bodyText
-            }
-          }));
+            window.dispatchEvent(new CustomEvent('gemling-api-captured', {
+              detail: {
+                url: this._gemlingUrl,
+                rpcId: rpcId,
+                sourcePathRaw: sourcePathRaw,
+                at: at,
+                fReqTemplate: innerStr,
+                bodyTemplate: bodyText
+              }
+            }));
+          }
         }
       } catch(e) {
         console.error('[Gemling] parse error:', e);
