@@ -52,11 +52,15 @@
     actionBar.innerHTML = `
       <span class="gemling-count">已选中 0 项</span>
       <span class="gemling-status"></span>
+      <button class="gemling-btn gemling-btn-cancel">取消</button>
       <button class="gemling-btn gemling-btn-add" disabled>添加到笔记本</button>
       <button class="gemling-btn gemling-btn-delete" disabled>删除</button>
     `;
 
     document.body.appendChild(actionBar);
+
+    const btnCancel = actionBar.querySelector('.gemling-btn-cancel');
+    btnCancel.addEventListener('click', handleCancelSelection);
 
     const btnAdd = actionBar.querySelector('.gemling-btn-add');
     btnAdd.addEventListener('click', handleBulkAddToNotebook);
@@ -194,6 +198,28 @@
     return convId.startsWith('c_') ? convId : `c_${convId}`;
   }
 
+  function handleCancelSelection() {
+    checkedConversationIds.clear();
+    document.querySelectorAll('.gemling-checkbox').forEach(cb => {
+      cb.dataset.checked = 'false';
+    });
+
+    if (actionBar) {
+      const btnAdd = actionBar.querySelector('.gemling-btn-add');
+      if (btnAdd) {
+        btnAdd.dataset.state = '';
+        btnAdd.textContent = '添加到笔记本';
+      }
+      const btnDelete = actionBar.querySelector('.gemling-btn-delete');
+      if (btnDelete) {
+        btnDelete.dataset.state = '';
+        btnDelete.textContent = '删除';
+      }
+    }
+
+    updateCount();
+  }
+
   async function handleBulkAddToNotebook() {
     await executeBulkAction('add');
   }
@@ -248,7 +274,7 @@
     }
 
     // 等待 API 捕获
-    const captured = await waitForApiCapture(30000);
+    const captured = await waitForApiCapture(30000, !isAdd);
     if (!captured) {
       btn.textContent = isAdd ? '添加到笔记本' : '删除';
       updateButtonState();
@@ -336,7 +362,7 @@
     console.error('[Gemling] 未找到匹配的菜单项:', keywords);
   }
 
-  function waitForApiCapture(timeout) {
+  function waitForApiCapture(timeout, expectDialog) {
     return new Promise((resolve) => {
       if (apiState) {
         resolve(true);
@@ -366,28 +392,30 @@
 
       window.addEventListener('gemling-api-captured', apiHandler);
 
-      // 监听系统对话框的出现和消失 (如果用户点击取消/关闭对话框，则提前终止等待)
-      dialogObserver = new MutationObserver(() => {
-        const dialog = document.querySelector('mat-dialog-container');
-        if (!dialog) {
-          // 如果系统对话框消失，给 500ms 缓冲等待 API 捕获
-          // 如果 API 没捕获，说明用户点击了“取消”或点击空白处关闭了对话框
-          if (!dialogCloseTimeout && !resolved) {
-            dialogCloseTimeout = setTimeout(() => {
-              console.log('[Gemling] 系统对话框已关闭，未捕获 API，取消批量操作');
-              finish(false);
-            }, 500);
+      if (expectDialog) {
+        // 监听系统对话框的出现和消失 (如果用户点击取消/关闭对话框，则提前终止等待)
+        dialogObserver = new MutationObserver(() => {
+          const dialog = document.querySelector('mat-dialog-container');
+          if (!dialog) {
+            // 如果系统对话框消失，给 500ms 缓冲等待 API 捕获
+            // 如果 API 没捕获，说明用户点击了“取消”或点击空白处关闭了对话框
+            if (!dialogCloseTimeout && !resolved) {
+              dialogCloseTimeout = setTimeout(() => {
+                console.log('[Gemling] 系统对话框已关闭，未捕获 API，取消批量操作');
+                finish(false);
+              }, 500);
+            }
+          } else {
+            // 如果弹出了新对话框（或重新弹出），清除超时器
+            if (dialogCloseTimeout) {
+              clearTimeout(dialogCloseTimeout);
+              dialogCloseTimeout = null;
+            }
           }
-        } else {
-          // 如果弹出了新对话框（或重新弹出），清除超时器
-          if (dialogCloseTimeout) {
-            clearTimeout(dialogCloseTimeout);
-            dialogCloseTimeout = null;
-          }
-        }
-      });
+        });
 
-      dialogObserver.observe(document.body, { childList: true, subtree: true });
+        dialogObserver.observe(document.body, { childList: true, subtree: true });
+      }
 
       setTimeout(() => {
         console.log('[Gemling] 等待 API 捕获超时');
