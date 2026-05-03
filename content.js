@@ -199,10 +199,6 @@
   }
 
   async function handleBulkDelete() {
-    const count = checkedConversationIds.size;
-    if (!confirm(`确定要批量删除这 ${count} 个对话吗？此操作不可恢复。`)) {
-      return;
-    }
     await executeBulkAction('delete');
   }
 
@@ -347,16 +343,55 @@
         return;
       }
 
-      const handler = () => {
-        window.removeEventListener('gemling-api-captured', handler);
-        resolve(true);
+      let resolved = false;
+      let dialogObserver = null;
+      let dialogCloseTimeout = null;
+
+      const cleanup = () => {
+        resolved = true;
+        window.removeEventListener('gemling-api-captured', apiHandler);
+        if (dialogObserver) dialogObserver.disconnect();
+        if (dialogCloseTimeout) clearTimeout(dialogCloseTimeout);
       };
 
-      window.addEventListener('gemling-api-captured', handler);
+      const finish = (result) => {
+        if (resolved) return;
+        cleanup();
+        resolve(result);
+      };
+
+      const apiHandler = () => {
+        finish(true);
+      };
+
+      window.addEventListener('gemling-api-captured', apiHandler);
+
+      // 监听系统对话框的出现和消失 (如果用户点击取消/关闭对话框，则提前终止等待)
+      dialogObserver = new MutationObserver(() => {
+        const dialog = document.querySelector('mat-dialog-container');
+        if (!dialog) {
+          // 如果系统对话框消失，给 500ms 缓冲等待 API 捕获
+          // 如果 API 没捕获，说明用户点击了“取消”或点击空白处关闭了对话框
+          if (!dialogCloseTimeout && !resolved) {
+            dialogCloseTimeout = setTimeout(() => {
+              console.log('[Gemling] 系统对话框已关闭，未捕获 API，取消批量操作');
+              finish(false);
+            }, 500);
+          }
+        } else {
+          // 如果弹出了新对话框（或重新弹出），清除超时器
+          if (dialogCloseTimeout) {
+            clearTimeout(dialogCloseTimeout);
+            dialogCloseTimeout = null;
+          }
+        }
+      });
+
+      dialogObserver.observe(document.body, { childList: true, subtree: true });
 
       setTimeout(() => {
-        window.removeEventListener('gemling-api-captured', handler);
-        resolve(false);
+        console.log('[Gemling] 等待 API 捕获超时');
+        finish(false);
       }, timeout);
     });
   }
