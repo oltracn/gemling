@@ -1,0 +1,10 @@
+{
+  "extName": { "message": "Gemling - Gemini Bulk Batch Manager" },
+  "extDesc": { "message": "Batch manage Google Gemini conversations, including moving multiple chats to a notebook with one click." },
+  "actionAdd": { "message": "Add to Notebook" },
+  "actionSelect": { "message": "Please select notebook..." },
+  "actionProcessing": { "message": "Processing $CURRENT$/$TOTAL$", "placeholders": { "CURRENT": { "content": "$1" }, "TOTAL": { "content": "$2" } } },
+  "actionDone": { "message": "Done ($SUCCESS$ succeeded$FAIL_MSG$)", "placeholders": { "SUCCESS": { "content": "$1" }, "FAIL_MSG": { "content": "$2" } } },
+  "actionFailMsg": { "message": ", $FAIL$ failed", "placeholders": { "FAIL": { "content": "$1" } } },
+  "countSelected": { "message": "$COUNT$ selected", "placeholders": { "COUNT": { "content": "$1" } } }
+}

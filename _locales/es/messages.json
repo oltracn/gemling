@@ -1,0 +1,10 @@
+{
+  "extName": { "message": "Gemling - Administrador por lotes de Gemini" },
+  "extDesc": { "message": "Administre por lotes las conversaciones de Google Gemini, como mover varios chats a un cuaderno con un solo clic." },
+  "actionAdd": { "message": "Añadir a cuaderno" },
+  "actionSelect": { "message": "Seleccione el cuaderno..." },
+  "actionProcessing": { "message": "Procesando $CURRENT$/$TOTAL$", "placeholders": { "CURRENT": { "content": "$1" }, "TOTAL": { "content": "$2" } } },
+  "actionDone": { "message": "Hecho ($SUCCESS$ exitosos$FAIL_MSG$)", "placeholders": { "SUCCESS": { "content": "$1" }, "FAIL_MSG": { "content": "$2" } } },
+  "actionFailMsg": { "message": ", $FAIL$ fallidos", "placeholders": { "FAIL": { "content": "$1" } } },
+  "countSelected": { "message": "$COUNT$ seleccionados", "placeholders": { "COUNT": { "content": "$1" } } }
+}

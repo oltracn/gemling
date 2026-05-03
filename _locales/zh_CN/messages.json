@@ -1,0 +1,10 @@
+{
+  "extName": { "message": "Gemling - Gemini 对话批处理工具" },
+  "extDesc": { "message": "批量管理 Google Gemini 对话，支持一键将多个对话移动到笔记本。" },
+  "actionAdd": { "message": "添加到笔记本" },
+  "actionSelect": { "message": "请选择笔记本..." },
+  "actionProcessing": { "message": "处理中 $CURRENT$/$TOTAL$", "placeholders": { "CURRENT": { "content": "$1" }, "TOTAL": { "content": "$2" } } },
+  "actionDone": { "message": "完成 (成功 $SUCCESS$ 项$FAIL_MSG$)", "placeholders": { "SUCCESS": { "content": "$1" }, "FAIL_MSG": { "content": "$2" } } },
+  "actionFailMsg": { "message": "，失败 $FAIL$ 项", "placeholders": { "FAIL": { "content": "$1" } } },
+  "countSelected": { "message": "已选中 $COUNT$ 项", "placeholders": { "COUNT": { "content": "$1" } } }
+}
