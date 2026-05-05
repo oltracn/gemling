@@ -8,6 +8,9 @@
   let checkedConversationIds = new Set(); // 用 conversationId 存储选中状态
   let actionBar = null;
   let apiState = null; // { at, notebookPath, bodyTemplate }
+  let isBulkDeleteActive = false;
+  let apiStateDelete = null;
+  let awaitDeleteConvId = null;
 
   function init() {
     observeConversationList();
@@ -27,6 +30,16 @@
       console.log('[Gemling] sourcePathRaw:', sourcePathRaw);
       updateButtonState();
     });
+
+    window.addEventListener('gemling-api-captured-raw', (e) => {
+      if (isBulkDeleteActive && awaitDeleteConvId) {
+        const { url, sourcePathRaw, bodyTemplate } = e.detail;
+        if (bodyTemplate && bodyTemplate.includes(awaitDeleteConvId)) {
+          apiStateDelete = { url, sourcePathRaw, bodyTemplate, originalConvId: awaitDeleteConvId };
+          console.log(`[Gemling] Delete API 已捕获: convId=${awaitDeleteConvId}`);
+        }
+      }
+    });
   }
 
   function injectActionBar() {
@@ -38,18 +51,32 @@
     // 初始化国际化文本
     const selectedText = chrome.i18n.getMessage("countSelected", ["0"]);
     const addText = chrome.i18n.getMessage("actionAdd");
+    const deleteText = chrome.i18n.getMessage("actionDelete");
+    const cancelText = chrome.i18n.getMessage("actionCancel");
 
     actionBar.innerHTML = `
       <span class="gemling-count">${selectedText}</span>
       <span class="gemling-status"></span>
       <button class="gemling-btn" disabled>${addText}</button>
+      <button class="gemling-btn gemling-btn-delete" disabled>${deleteText}</button>
+      <button class="gemling-btn gemling-btn-cancel" disabled>${cancelText}</button>
     `;
 
     document.body.appendChild(actionBar);
 
-    const btn = actionBar.querySelector('.gemling-btn');
+    const btn = actionBar.querySelector('.gemling-btn:not(.gemling-btn-delete):not(.gemling-btn-cancel)');
     if (btn) {
       btn.addEventListener('click', handleBulkAddToNotebook);
+    }
+
+    const btnDelete = actionBar.querySelector('.gemling-btn-delete');
+    if (btnDelete) {
+      btnDelete.addEventListener('click', handleBulkDelete);
+    }
+
+    const btnCancel = actionBar.querySelector('.gemling-btn-cancel');
+    if (btnCancel) {
+      btnCancel.addEventListener('click', handleCancelBulk);
     }
   }
 
@@ -73,7 +100,9 @@
   }
 
   function updateButtonState() {
-    const btn = actionBar.querySelector('.gemling-btn');
+    const btnAdd = actionBar.querySelector('.gemling-btn:not(.gemling-btn-delete):not(.gemling-btn-cancel)');
+    const btnDelete = actionBar.querySelector('.gemling-btn-delete');
+    const btnCancel = actionBar.querySelector('.gemling-btn-cancel');
     const statusEl = actionBar.querySelector('.gemling-status');
 
     // 清空状态提示，不再显示警告
@@ -82,11 +111,22 @@
       statusEl.className = 'gemling-status';
     }
 
-    if (btn?.dataset?.state === 'finished') {
-      btn.disabled = false;
-    } else if (btn) {
-      // 按钮始终可用（只要有选中项）
-      btn.disabled = checkedConversationIds.size === 0;
+    const hasSelection = checkedConversationIds.size > 0;
+
+    if (btnAdd?.dataset?.state === 'finished') {
+      btnAdd.disabled = false;
+    } else if (btnAdd) {
+      btnAdd.disabled = !hasSelection;
+    }
+
+    if (btnDelete?.dataset?.state === 'finished') {
+      btnDelete.disabled = false;
+    } else if (btnDelete) {
+      btnDelete.disabled = !hasSelection;
+    }
+
+    if (btnCancel) {
+      btnCancel.disabled = !hasSelection;
     }
   }
 
@@ -168,6 +208,31 @@
   function normalizeConversationId(convId) {
     if (!convId) return null;
     return convId.startsWith('c_') ? convId : `c_${convId}`;
+  }
+
+
+  function handleCancelBulk() {
+    isBulkDeleteActive = false;
+    apiStateDelete = null;
+    checkedConversationIds.clear();
+    document.querySelectorAll('.gemling-checkbox').forEach(cb => {
+      cb.dataset.checked = 'false';
+    });
+
+    // reset button states
+    const btnAdd = actionBar?.querySelector('.gemling-btn:not(.gemling-btn-delete):not(.gemling-btn-cancel)');
+    if (btnAdd) {
+      btnAdd.dataset.state = '';
+      btnAdd.textContent = chrome.i18n.getMessage("actionAdd");
+    }
+
+    const btnDelete = actionBar?.querySelector('.gemling-btn-delete');
+    if (btnDelete) {
+      btnDelete.dataset.state = '';
+      btnDelete.textContent = chrome.i18n.getMessage("actionDelete");
+    }
+
+    updateCount();
   }
 
   async function handleBulkAddToNotebook() {
@@ -257,6 +322,172 @@
     btn.dataset.state = 'finished';
     btn.disabled = false;
     updateCount();
+  }
+
+
+  async function handleBulkDelete() {
+    const btnDelete = actionBar.querySelector('.gemling-btn-delete');
+    if (!btnDelete) return;
+
+    const actionDeleteText = chrome.i18n.getMessage("actionDelete");
+
+    if (btnDelete.dataset.state === 'finished') {
+      handleCancelBulk();
+      return;
+    }
+
+    btnDelete.disabled = true;
+    isBulkDeleteActive = true;
+    apiStateDelete = null;
+
+    const firstConvId = checkedConversationIds.values().next().value;
+    if (!firstConvId) {
+      btnDelete.disabled = false;
+      return;
+    }
+
+    const firstItem = findConversationItem(firstConvId);
+    if (!firstItem) {
+      console.error('[Gemling] 未找到对话项:', firstConvId);
+      btnDelete.disabled = false;
+      return;
+    }
+
+    awaitDeleteConvId = normalizeConversationId(firstConvId) || firstConvId;
+    btnDelete.textContent = "..."; // Processing indication
+    triggerNativeDelete(firstItem);
+
+    // Wait for dialog to appear and then disappear
+    const confirmed = await waitForDialogAndCaptureDelete();
+    if (!confirmed || !apiStateDelete) {
+      // User cancelled
+      handleCancelBulk();
+      return;
+    }
+
+    // First one deleted via UI, proceed to delete rest via API
+    checkedConversationIds.delete(firstConvId);
+
+    const convIds = Array.from(checkedConversationIds);
+    let successCount = 1;
+    let failCount = 0;
+
+    for (let i = 0; i < convIds.length; i++) {
+      const convId = convIds[i];
+      const current = (i + 2).toString();
+      const total = (convIds.length + 1).toString();
+      btnDelete.textContent = chrome.i18n.getMessage("actionProcessing", [current, total]);
+
+      try {
+        await deleteViaApi(convId);
+        successCount++;
+        const item = findConversationItem(convId);
+        if (item) {
+          const itemParent = item.closest('li') || item.parentElement;
+          if (itemParent) itemParent.remove();
+        }
+        checkedConversationIds.delete(convId);
+      } catch (err) {
+        console.error('[Gemling] 删除失败:', convId, err);
+        failCount++;
+      }
+
+      await delay(800);
+    }
+
+    const failMsg = failCount > 0 ? chrome.i18n.getMessage("actionFailMsg", [failCount.toString()]) : '';
+    btnDelete.textContent = chrome.i18n.getMessage("actionDone", [successCount.toString(), failMsg]);
+    btnDelete.dataset.state = 'finished';
+    btnDelete.disabled = false;
+    isBulkDeleteActive = false;
+    updateCount();
+  }
+
+  function triggerNativeDelete(item) {
+    const parent = item.parentElement;
+    const actionsContainer = parent?.querySelector('.conversation-actions-container');
+    const menuBtn = actionsContainer?.querySelector('button[data-test-id="conversation-actions-menu-icon-button"]') ||
+                    actionsContainer?.querySelector('button[aria-haspopup="menu"]');
+
+    if (!menuBtn) {
+      console.error('[Gemling] 未找到菜单按钮');
+      return;
+    }
+
+    menuBtn.click();
+
+    setTimeout(() => clickDeleteMenuItem(), 100);
+  }
+
+  function clickDeleteMenuItem() {
+    const menuItems = document.querySelectorAll('[role="menuitem"], [role="menuitemradio"]');
+    for (const menuItem of menuItems) {
+      const text = menuItem.textContent || '';
+      if (text.includes('删除') || text.includes('Delete') || text.includes('delete')) {
+        menuItem.click();
+        return;
+      }
+    }
+    console.error('[Gemling] 未找到删除菜单项');
+  }
+
+  function waitForDialogAndCaptureDelete() {
+    return new Promise(resolve => {
+      let dialogAppeared = false;
+      const checkInterval = setInterval(() => {
+        const dialog = document.querySelector('mat-dialog-container');
+        if (dialog) {
+          dialogAppeared = true;
+        } else if (dialogAppeared && !dialog) {
+          clearInterval(checkInterval);
+          // Wait a bit to ensure API request fires and is captured
+          setTimeout(() => {
+            resolve(!!apiStateDelete);
+          }, 500);
+        }
+      }, 200);
+    });
+  }
+
+  async function deleteViaApi(convId) {
+    const normalizedConvId = normalizeConversationId(convId);
+    if (!normalizedConvId) {
+      throw new Error('缺少有效的对话 ID');
+    }
+    if (!apiStateDelete) {
+      throw new Error('缺少 API 状态');
+    }
+
+    const originalConvId = apiStateDelete.originalConvId;
+    let bodyText = apiStateDelete.bodyTemplate;
+
+    // Simple string replace for the conversation ID within the URL encoded body
+    bodyText = bodyText.replace(new RegExp(originalConvId, 'g'), normalizedConvId);
+
+    const sourcePath = apiStateDelete.sourcePathRaw || '';
+    const capturedUrl = new URL(apiStateDelete.url, window.location.origin);
+    const bl = capturedUrl.searchParams.get('bl') || '';
+    const fSid = capturedUrl.searchParams.get('f.sid') || '';
+    const hl = capturedUrl.searchParams.get('hl') || 'zh-CN';
+
+    const reqid = Math.floor(Math.random() * 9000000) + 1000000;
+    capturedUrl.searchParams.set('_reqid', reqid.toString());
+    const url = capturedUrl.toString();
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8'
+      },
+      body: bodyText,
+      credentials: 'same-origin'
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    // We assume success on HTTP 200 for deletion
   }
 
   function findConversationItem(convId) {

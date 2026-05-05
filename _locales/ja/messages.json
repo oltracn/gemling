@@ -1,10 +1,58 @@
 {
-  "extName": { "message": "Gemling - Gemini 一括マネージャー" },
-  "extDesc": { "message": "Google Gemini の会話を一括管理し、ワンクリックで複数のチャットをノートブックに移動できます。" },
-  "actionAdd": { "message": "ノートブックに追加" },
-  "actionSelect": { "message": "ノートブックを選択してください..." },
-  "actionProcessing": { "message": "処理中 $CURRENT$/$TOTAL$", "placeholders": { "CURRENT": { "content": "$1" }, "TOTAL": { "content": "$2" } } },
-  "actionDone": { "message": "完了 (成功 $SUCCESS$ 件$FAIL_MSG$)", "placeholders": { "SUCCESS": { "content": "$1" }, "FAIL_MSG": { "content": "$2" } } },
-  "actionFailMsg": { "message": "、失敗 $FAIL$ 件", "placeholders": { "FAIL": { "content": "$1" } } },
-  "countSelected": { "message": "$COUNT$ 件選択", "placeholders": { "COUNT": { "content": "$1" } } }
+  "extName": {
+    "message": "Gemling - Gemini 一括マネージャー"
+  },
+  "extDesc": {
+    "message": "Google Gemini の会話を一括管理し、ワンクリックで複数のチャットをノートブックに移動できます。"
+  },
+  "actionAdd": {
+    "message": "ノートブックに追加"
+  },
+  "actionSelect": {
+    "message": "ノートブックを選択してください..."
+  },
+  "actionProcessing": {
+    "message": "処理中 $CURRENT$/$TOTAL$",
+    "placeholders": {
+      "CURRENT": {
+        "content": "$1"
+      },
+      "TOTAL": {
+        "content": "$2"
+      }
+    }
+  },
+  "actionDone": {
+    "message": "完了 (成功 $SUCCESS$ 件$FAIL_MSG$)",
+    "placeholders": {
+      "SUCCESS": {
+        "content": "$1"
+      },
+      "FAIL_MSG": {
+        "content": "$2"
+      }
+    }
+  },
+  "actionFailMsg": {
+    "message": "、失敗 $FAIL$ 件",
+    "placeholders": {
+      "FAIL": {
+        "content": "$1"
+      }
+    }
+  },
+  "countSelected": {
+    "message": "$COUNT$ 件選択",
+    "placeholders": {
+      "COUNT": {
+        "content": "$1"
+      }
+    }
+  },
+  "actionDelete": {
+    "message": "Delete"
+  },
+  "actionCancel": {
+    "message": "Cancel"
+  }
 }

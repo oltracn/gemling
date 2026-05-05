@@ -1,10 +1,58 @@
 {
-  "extName": { "message": "Gemling - Gestionnaire de lots Gemini" },
-  "extDesc": { "message": "Gérez en masse les conversations Google Gemini, y compris le déplacement de plusieurs discussions vers un carnet en un clic." },
-  "actionAdd": { "message": "Ajouter au carnet" },
-  "actionSelect": { "message": "Veuillez sélectionner le carnet..." },
-  "actionProcessing": { "message": "Traitement $CURRENT$/$TOTAL$", "placeholders": { "CURRENT": { "content": "$1" }, "TOTAL": { "content": "$2" } } },
-  "actionDone": { "message": "Terminé ($SUCCESS$ réussi(s)$FAIL_MSG$)", "placeholders": { "SUCCESS": { "content": "$1" }, "FAIL_MSG": { "content": "$2" } } },
-  "actionFailMsg": { "message": ", $FAIL$ échoué(s)", "placeholders": { "FAIL": { "content": "$1" } } },
-  "countSelected": { "message": "$COUNT$ sélectionné(s)", "placeholders": { "COUNT": { "content": "$1" } } }
+  "extName": {
+    "message": "Gemling - Gestionnaire de lots Gemini"
+  },
+  "extDesc": {
+    "message": "Gérez en masse les conversations Google Gemini, y compris le déplacement de plusieurs discussions vers un carnet en un clic."
+  },
+  "actionAdd": {
+    "message": "Ajouter au carnet"
+  },
+  "actionSelect": {
+    "message": "Veuillez sélectionner le carnet..."
+  },
+  "actionProcessing": {
+    "message": "Traitement $CURRENT$/$TOTAL$",
+    "placeholders": {
+      "CURRENT": {
+        "content": "$1"
+      },
+      "TOTAL": {
+        "content": "$2"
+      }
+    }
+  },
+  "actionDone": {
+    "message": "Terminé ($SUCCESS$ réussi(s)$FAIL_MSG$)",
+    "placeholders": {
+      "SUCCESS": {
+        "content": "$1"
+      },
+      "FAIL_MSG": {
+        "content": "$2"
+      }
+    }
+  },
+  "actionFailMsg": {
+    "message": ", $FAIL$ échoué(s)",
+    "placeholders": {
+      "FAIL": {
+        "content": "$1"
+      }
+    }
+  },
+  "countSelected": {
+    "message": "$COUNT$ sélectionné(s)",
+    "placeholders": {
+      "COUNT": {
+        "content": "$1"
+      }
+    }
+  },
+  "actionDelete": {
+    "message": "Delete"
+  },
+  "actionCancel": {
+    "message": "Cancel"
+  }
 }
