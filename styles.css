@@ -109,13 +109,13 @@
 }
 
 .gemling-btn-cancel {
-  background: #f4f4f5;
-  color: #3f3f46;
-  border: 1px solid #e4e4e7;
+  background: #e4e4e7;
+  color: #27272a;
+  border: 1px solid #d4d4d8;
 }
 
 .gemling-btn-cancel:hover {
-  background: #e4e4e7;
+  background: #d4d4d8;
 }
 
 .gemling-btn-cancel:disabled {
