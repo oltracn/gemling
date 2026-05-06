@@ -57,9 +57,9 @@
     actionBar.innerHTML = `
       <span class="gemling-count">${selectedText}</span>
       <span class="gemling-status"></span>
-      <button class="gemling-btn" disabled>${addText}</button>
-      <button class="gemling-btn gemling-btn-delete" disabled>${deleteText}</button>
       <button class="gemling-btn gemling-btn-cancel" disabled>${cancelText}</button>
+      <button class="gemling-btn gemling-btn-delete" disabled>${deleteText}</button>
+      <button class="gemling-btn" disabled>${addText}</button>
     `;
 
     document.body.appendChild(actionBar);
@@ -89,8 +89,9 @@
       countEl.textContent = chrome.i18n.getMessage("countSelected", [count.toString()]);
     }
 
-    const btn = actionBar.querySelector('.gemling-btn');
-    if (count > 0 || btn?.dataset?.state === 'finished') {
+    const btn = actionBar.querySelector('.gemling-btn:not(.gemling-btn-delete):not(.gemling-btn-cancel)');
+    const btnDelete = actionBar.querySelector(".gemling-btn-delete");
+    if (count > 0 || btn?.dataset?.state === 'finished' || btnDelete?.dataset?.state === 'finished') {
       actionBar.classList.remove('gemling-action-bar-hidden');
     } else {
       actionBar.classList.add('gemling-action-bar-hidden');
@@ -100,7 +101,7 @@
   }
 
   function updateButtonState() {
-    const btnAdd = actionBar.querySelector('.gemling-btn:not(.gemling-btn-delete):not(.gemling-btn-cancel)');
+    const btn = actionBar.querySelector('.gemling-btn:not(.gemling-btn-delete):not(.gemling-btn-cancel)');
     const btnDelete = actionBar.querySelector('.gemling-btn-delete');
     const btnCancel = actionBar.querySelector('.gemling-btn-cancel');
     const statusEl = actionBar.querySelector('.gemling-status');
@@ -113,10 +114,10 @@
 
     const hasSelection = checkedConversationIds.size > 0;
 
-    if (btnAdd?.dataset?.state === 'finished') {
-      btnAdd.disabled = false;
-    } else if (btnAdd) {
-      btnAdd.disabled = !hasSelection;
+    if (btn?.dataset?.state === 'finished') {
+      btn.disabled = false;
+    } else if (btn) {
+      btn.disabled = !hasSelection;
     }
 
     if (btnDelete?.dataset?.state === 'finished') {
@@ -186,10 +187,16 @@
         checkedConversationIds.delete(convId);
       }
 
-      const btn = actionBar?.querySelector('.gemling-btn');
+      const btn = actionBar?.querySelector('.gemling-btn:not(.gemling-btn-delete):not(.gemling-btn-cancel)');
       if (btn && btn.dataset.state === 'finished') {
         btn.dataset.state = '';
         btn.textContent = chrome.i18n.getMessage("actionAdd");
+      }
+
+      const btnDelete = actionBar?.querySelector('.gemling-btn-delete');
+      if (btnDelete && btnDelete.dataset.state === 'finished') {
+        btnDelete.dataset.state = '';
+        btnDelete.textContent = chrome.i18n.getMessage("actionDelete");
       }
 
       updateCount();
@@ -220,10 +227,10 @@
     });
 
     // reset button states
-    const btnAdd = actionBar?.querySelector('.gemling-btn:not(.gemling-btn-delete):not(.gemling-btn-cancel)');
-    if (btnAdd) {
-      btnAdd.dataset.state = '';
-      btnAdd.textContent = chrome.i18n.getMessage("actionAdd");
+    const btn = actionBar?.querySelector('.gemling-btn:not(.gemling-btn-delete):not(.gemling-btn-cancel)');
+    if (btn) {
+      btn.dataset.state = '';
+      btn.textContent = chrome.i18n.getMessage("actionAdd");
     }
 
     const btnDelete = actionBar?.querySelector('.gemling-btn-delete');
@@ -236,7 +243,7 @@
   }
 
   async function handleBulkAddToNotebook() {
-    const btn = actionBar.querySelector('.gemling-btn');
+    const btn = actionBar.querySelector('.gemling-btn:not(.gemling-btn-delete):not(.gemling-btn-cancel)');
     if (!btn) return;
 
     const actionAddText = chrome.i18n.getMessage("actionAdd");
