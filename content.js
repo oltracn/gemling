@@ -2,7 +2,8 @@
   'use strict';
 
   const SELECTORS = {
-    conversationItem: 'a[data-test-id="conversation"]'
+    conversationItem: 'a[href*="/app/"]',
+    searchSnippet: 'search-snippet, search-zero-state .conversation-container, project-chat-row'
   };
 
   let checkedConversationIds = new Set(); // 用 conversationId 存储选中状态
@@ -11,13 +12,68 @@
   let isBulkDeleteActive = false;
   let apiStateDelete = null;
   let awaitDeleteConvId = null;
+  let isEnabled = true;
+  let conversationObserver = null;
+  let snippetInterval = null;
 
   function init() {
+    chrome.storage.local.get({ isEnabled: true }, (result) => {
+      isEnabled = result.isEnabled;
+      if (isEnabled) {
+        startExtension();
+      } else {
+        listenForMessages();
+      }
+    });
+  }
+
+  function startExtension() {
     observeConversationList();
     listenForApiCapture();
+    listenForMessages();
+
+    // Inject checkboxes for existing items
+    document.querySelectorAll(SELECTORS.conversationItem).forEach(injectCheckbox);
+    document.querySelectorAll(SELECTORS.searchSnippet).forEach(injectCheckbox);
+    updateCount();
+  }
+
+  function stopExtension() {
+    if (conversationObserver) {
+      conversationObserver.disconnect();
+      conversationObserver = null;
+    }
+    if (snippetInterval) {
+      clearInterval(snippetInterval);
+      snippetInterval = null;
+    }
+    document.querySelectorAll('.gemling-checkbox').forEach(cb => cb.remove());
+    checkedConversationIds.clear();
+    if (actionBar) {
+      actionBar.classList.add('gemling-action-bar-hidden');
+    }
+  }
+
+  function listenForMessages() {
+    if (window.gemlingListenerAdded) return;
+    window.gemlingListenerAdded = true;
+
+    chrome.runtime.onMessage.addListener((message) => {
+      if (message.action === 'toggle-gemling') {
+        isEnabled = message.isEnabled;
+        if (isEnabled) {
+          startExtension();
+        } else {
+          stopExtension();
+        }
+      }
+    });
   }
 
   function listenForApiCapture() {
+    if (window.gemlingApiCapturedListenerAdded) return;
+    window.gemlingApiCapturedListenerAdded = true;
+
     window.addEventListener('gemling-api-captured', (e) => {
       const { url, sourcePathRaw, at, notebookPath, bodyTemplate, convId } = e.detail;
       // 只接受有效的捕获数据（notebookPath 必须存在）
@@ -132,32 +188,66 @@
   }
 
   function observeConversationList() {
-    const observer = new MutationObserver((mutations) => {
+    if (conversationObserver) return;
+
+    conversationObserver = new MutationObserver((mutations) => {
       mutations.forEach((mutation) => {
         mutation.addedNodes.forEach((node) => {
           if (node.nodeType === Node.ELEMENT_NODE) {
-            if (node.matches(SELECTORS.conversationItem)) {
+            if (node.matches(SELECTORS.conversationItem) || node.matches(SELECTORS.searchSnippet)) {
               injectCheckbox(node);
             }
             node.querySelectorAll(SELECTORS.conversationItem).forEach(injectCheckbox);
+            node.querySelectorAll(SELECTORS.searchSnippet).forEach(injectCheckbox);
           }
         });
       });
     });
 
-    observer.observe(document.body, {
+    conversationObserver.observe(document.body, {
       childList: true,
       subtree: true
     });
 
     document.querySelectorAll(SELECTORS.conversationItem).forEach(injectCheckbox);
+    document.querySelectorAll(SELECTORS.searchSnippet).forEach(injectCheckbox);
+
+    // Request conv IDs from probe.js periodically for snippets and project-chat-rows
+    if (!snippetInterval) {
+      snippetInterval = setInterval(() => {
+        if (document.querySelector('search-snippet:not([data-gemling-conv-id]), search-zero-state .conversation-container:not([data-gemling-conv-id]), project-chat-row:not([data-gemling-conv-id])')) {
+          window.dispatchEvent(new CustomEvent('gemling-request-conv-id'));
+        }
+      }, 1000);
+    }
+
+    if (!window.convIdReadyListenerAdded) {
+      window.convIdReadyListenerAdded = true;
+      window.addEventListener('gemling-conv-id-ready', () => {
+        if (isEnabled) {
+          document.querySelectorAll(SELECTORS.searchSnippet).forEach(injectCheckbox);
+        }
+      });
+    }
   }
 
   function injectCheckbox(item) {
     if (item.querySelector('.gemling-checkbox')) return;
 
     const convId = getConversationId(item);
-    if (!convId) return;
+    if (!convId) return; // Might be a snippet still waiting for its ID
+
+    // Ensure search-snippet is relative for absolute checkbox positioning
+    if (item.tagName.toLowerCase() === 'search-snippet') {
+      if (!item.style.position) {
+        item.style.position = 'relative'; 
+      }
+    } else if (item.classList.contains('conversation-container')) {
+      if (!item.style.display || item.style.display === 'block') {
+        item.style.display = 'flex';
+        item.style.alignItems = 'center';
+      }
+    }
 
     const checkbox = document.createElement('div');
     checkbox.className = 'gemling-checkbox';
@@ -202,14 +292,34 @@
       updateCount();
     });
 
-    item.insertBefore(checkbox, item.firstChild);
+    let targetContainer = item;
+    if (item.tagName.toLowerCase() === 'project-chat-row') {
+      targetContainer = item.querySelector('.project-chat-row-container') || item;
+    } else {
+      const startArea = item.querySelector('.mdc-list-item__start') || item.querySelector('.leading-icon-container');
+      if (startArea) {
+        targetContainer = startArea;
+      }
+    }
+    targetContainer.insertBefore(checkbox, targetContainer.firstChild);
   }
 
   function getConversationId(item) {
+    if (item.tagName.toLowerCase() === 'search-snippet' || item.classList.contains('conversation-container') || item.tagName.toLowerCase() === 'project-chat-row') {
+      const id = item.getAttribute('data-gemling-conv-id');
+      return (!id || id === 'not-found') ? null : id;
+    }
+
     const href = item.getAttribute('href') || '';
     // href 格式: /app/xxx 或 /app/xxx/yyy
-    const match = href.match(/^\/app\/([^/?#]+)/);
+    const match = href.match(/\/app\/([^/?#]+)/);
     return match ? match[1] : null;
+  }
+
+  function isRealConversationId(convId) {
+    if (!convId) return false;
+    if (convId.startsWith('pending-') || convId.startsWith('not-found-') || convId.startsWith('search-result-')) return false;
+    return true;
   }
 
   function normalizeConversationId(convId) {
@@ -289,8 +399,8 @@
 
     // API 已捕获（用户已选择笔记本），第一个对话已通过手动添加成功
     // 从 DOM 中移除该对话并从 checkedConversationIds 中删除
-    const firstItemParent = firstItem.closest('li') || firstItem.parentElement;
-    if (firstItemParent) firstItemParent.remove();
+    const firstItemToRemove = firstItem.closest('gem-nav-list-item') || firstItem.closest('project-chat-row') || firstItem.closest('li') || firstItem;
+    firstItemToRemove.remove();
     checkedConversationIds.delete(firstConvId);
 
     // 批量处理所有选中的对话
@@ -312,8 +422,8 @@
         // 从 DOM 中移除该对话并从 checkedConversationIds 中删除
         const item = findConversationItem(convId);
         if (item) {
-          const itemParent = item.closest('li') || item.parentElement;
-          if (itemParent) itemParent.remove();
+          const itemToRemove = item.closest('gem-nav-list-item') || item.closest('project-chat-row') || item.closest('li') || item;
+          itemToRemove.remove();
         }
         checkedConversationIds.delete(convId);
       } catch (err) {
@@ -374,6 +484,10 @@
 
     // First one deleted via UI, proceed to delete rest via API
     checkedConversationIds.delete(firstConvId);
+    if (firstItem) {
+      const firstItemToRemove = firstItem.closest('gem-nav-list-item') || firstItem.closest('project-chat-row') || firstItem.closest('li') || firstItem;
+      firstItemToRemove.remove();
+    }
 
     const convIds = Array.from(checkedConversationIds);
     let successCount = 1;
@@ -390,8 +504,8 @@
         successCount++;
         const item = findConversationItem(convId);
         if (item) {
-          const itemParent = item.closest('li') || item.parentElement;
-          if (itemParent) itemParent.remove();
+          const itemToRemove = item.closest('gem-nav-list-item') || item.closest('project-chat-row') || item.closest('li') || item;
+          itemToRemove.remove();
         }
         checkedConversationIds.delete(convId);
       } catch (err) {
@@ -411,10 +525,42 @@
   }
 
   function triggerNativeDelete(item) {
-    const parent = item.parentElement;
-    const actionsContainer = parent?.querySelector('.conversation-actions-container');
-    const menuBtn = actionsContainer?.querySelector('button[data-test-id="conversation-actions-menu-icon-button"]') ||
-                    actionsContainer?.querySelector('button[aria-haspopup="menu"]');
+    const container = item.closest('gem-nav-list-item') || item.closest('project-chat-row') || item.parentElement;
+    let menuBtn = container?.querySelector('button[data-test-id="actions-menu-button"]') ||
+                  container?.querySelector('button[data-test-id="conversation-actions-menu-icon-button"]') ||
+                  container?.querySelector('.gem-conversation-actions-menu-button') ||
+                  container?.querySelector('button[aria-label="更多选项"]') ||
+                  container?.querySelector('button[aria-label="More options"]') ||
+                  container?.querySelector('button[aria-haspopup="menu"]') ||
+                  container?.querySelector('gem-icon-button[aria-haspopup="true"] button') ||
+                  container?.querySelector('button');
+
+    if (!menuBtn) {
+      // Find fallback menu button for search-snippets
+      const fallbackItem = document.querySelector(SELECTORS.conversationItem);
+      if (fallbackItem) {
+        const fallbackContainer = fallbackItem.closest('gem-nav-list-item') || fallbackItem.closest('project-chat-row') || fallbackItem.parentElement;
+        menuBtn = fallbackContainer?.querySelector('button[data-test-id="actions-menu-button"]') ||
+                  fallbackContainer?.querySelector('button[data-test-id="conversation-actions-menu-icon-button"]') ||
+                  fallbackContainer?.querySelector('button[aria-label="更多选项"]') ||
+                  fallbackContainer?.querySelector('button[aria-label="More options"]') ||
+                  fallbackContainer?.querySelector('button[aria-haspopup="menu"]') ||
+                  fallbackContainer?.querySelector('gem-icon-button[aria-haspopup="true"] button') ||
+                  fallbackContainer?.querySelector('button');
+        if (menuBtn) {
+          const fallbackConvId = getConversationId(fallbackItem);
+          const targetConvId = getConversationId(item);
+          if (fallbackConvId && targetConvId) {
+             window.dispatchEvent(new CustomEvent('gemling-set-override-delete', {
+               detail: {
+                 original: normalizeConversationId(fallbackConvId),
+                 target: normalizeConversationId(targetConvId)
+               }
+             }));
+          }
+        }
+      }
+    }
 
     if (!menuBtn) {
       console.error('[Gemling] 未找到菜单按钮');
@@ -426,16 +572,28 @@
     setTimeout(() => clickDeleteMenuItem(), 100);
   }
 
-  function clickDeleteMenuItem() {
-    const menuItems = document.querySelectorAll('[role="menuitem"], [role="menuitemradio"]');
-    for (const menuItem of menuItems) {
-      const text = menuItem.textContent || '';
-      if (text.includes('删除') || text.includes('Delete') || text.includes('delete')) {
-        menuItem.click();
-        return;
+  function pollAndClickMenu(keywords) {
+    let attempts = 0;
+    const interval = setInterval(() => {
+      attempts++;
+      const menuItems = document.querySelectorAll('[role="menuitem"], [role="menuitemradio"], mat-menu-item');
+      for (const menuItem of menuItems) {
+        const text = menuItem.textContent || '';
+        if (keywords.some(kw => text.includes(kw))) {
+          clearInterval(interval);
+          menuItem.click();
+          return;
+        }
       }
-    }
-    console.error('[Gemling] 未找到删除菜单项');
+      if (attempts > 20) {
+        clearInterval(interval);
+        console.error('[Gemling] 未找到菜单项:', keywords);
+      }
+    }, 100);
+  }
+
+  function clickDeleteMenuItem() {
+    pollAndClickMenu(['删除', 'Delete', 'delete']);
   }
 
   function waitForDialogAndCaptureDelete() {
@@ -499,7 +657,7 @@
 
   function findConversationItem(convId) {
     // 根据 conversationId 查找对应的对话项 DOM 元素
-    const items = document.querySelectorAll(SELECTORS.conversationItem);
+    const items = document.querySelectorAll(`${SELECTORS.conversationItem}, ${SELECTORS.searchSnippet}`);
     for (const item of items) {
       const itemConvId = getConversationId(item);
       if (itemConvId === convId) {
@@ -510,11 +668,38 @@
   }
 
   function triggerNativeAddToNotebook(item) {
-    // 三点菜单按钮在对话项的兄弟元素 conversation-actions-container 中
-    const parent = item.parentElement;
-    const actionsContainer = parent?.querySelector('.conversation-actions-container');
-    const menuBtn = actionsContainer?.querySelector('button[data-test-id="conversation-actions-menu-icon-button"]') ||
-                    actionsContainer?.querySelector('button[aria-haspopup="menu"]');
+    const container = item.closest('gem-nav-list-item') || item.closest('project-chat-row') || item.parentElement;
+    let menuBtn = container?.querySelector('button[data-test-id="actions-menu-button"]') ||
+                  container?.querySelector('button[data-test-id="conversation-actions-menu-icon-button"]') ||
+                  container?.querySelector('.gem-conversation-actions-menu-button') ||
+                  container?.querySelector('button[aria-label="更多选项"]') ||
+                  container?.querySelector('button[aria-label="More options"]') ||
+                  container?.querySelector('button[aria-haspopup="menu"]') ||
+                  container?.querySelector('gem-icon-button[aria-haspopup="true"] button') ||
+                  container?.querySelector('button');
+
+    if (!menuBtn) {
+      // Fallback: Use a random conversation item's menu and proxy the convId
+      const fallbackItem = document.querySelector(SELECTORS.conversationItem);
+      if (fallbackItem) {
+        const fallbackContainer = fallbackItem.closest('gem-nav-list-item') || fallbackItem.closest('project-chat-row') || fallbackItem.parentElement;
+        menuBtn = fallbackContainer?.querySelector('button[data-test-id="actions-menu-button"]') ||
+                  fallbackContainer?.querySelector('button[data-test-id="conversation-actions-menu-icon-button"]') ||
+                  fallbackContainer?.querySelector('button[aria-label="更多选项"]') ||
+                  fallbackContainer?.querySelector('button[aria-label="More options"]') ||
+                  fallbackContainer?.querySelector('button[aria-haspopup="menu"]') ||
+                  fallbackContainer?.querySelector('gem-icon-button[aria-haspopup="true"] button') ||
+                  fallbackContainer?.querySelector('button');
+        if (menuBtn) {
+          const targetConvId = getConversationId(item);
+          if (targetConvId) {
+            window.dispatchEvent(new CustomEvent('gemling-set-override-convid', {
+              detail: { convId: normalizeConversationId(targetConvId) }
+            }));
+          }
+        }
+      }
+    }
 
     if (!menuBtn) {
       console.error('[Gemling] 未找到菜单按钮');
@@ -528,26 +713,7 @@
   }
 
   function clickAddToNotebookMenuItem() {
-    // 查找菜单中的"添加到笔记本"选项
-    const menuItems = document.querySelectorAll('[role="menuitem"], [role="menuitemradio"]');
-    for (const menuItem of menuItems) {
-      const text = menuItem.textContent || '';
-      if (text.includes('笔记本') || text.includes('notebook') || text.includes('Notebook')) {
-        menuItem.click();
-        return;
-      }
-    }
-
-    // 如果没找到，可能是英文界面
-    for (const menuItem of menuItems) {
-      const text = menuItem.textContent || '';
-      if (text.includes('Save') || text.includes('save') || text.includes('Add')) {
-        menuItem.click();
-        return;
-      }
-    }
-
-    console.error('[Gemling] 未找到"添加到笔记本"菜单项');
+    pollAndClickMenu(['笔记本', 'notebook', 'Notebook', 'Save', 'save', 'Add']);
   }
 
   function waitForApiCapture(timeout) {
