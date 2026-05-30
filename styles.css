@@ -13,6 +13,9 @@
   box-sizing: border-box !important;
   display: inline-block !important;
   vertical-align: middle !important;
+  align-self: center !important;
+  margin-top: auto !important;
+  margin-bottom: auto !important;
 }
 
 .gemling-checkbox[data-checked="true"] {
@@ -121,4 +124,55 @@
 .gemling-btn-cancel:disabled {
   color: #a1a1aa;
   cursor: not-allowed;
+}
+
+search-snippet {
+  display: flex !important;
+  align-items: center !important;
+}
+
+search-snippet > .gemling-checkbox {
+  margin-right: 16px !important;
+  margin-left: 12px !important;
+}
+
+gem-nav-list-item[data-test-id="conversation"] a {
+  display: flex !important;
+  align-items: center !important;
+}
+
+.mdc-list-item__start:has(.gemling-checkbox) {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 24px !important;
+  min-width: 24px !important;
+  margin-right: 8px !important;
+  margin-left: 0 !important;
+}
+
+.mdc-list-item__start .gemling-checkbox {
+  margin: 0 !important;
+  align-self: unset !important;
+  top: -2px !important;
+}
+
+project-chat-row .project-chat-row-container {
+  display: flex !important;
+  align-items: center !important;
+}
+
+project-chat-row .project-chat-row-content {
+  flex-grow: 1 !important;
+}
+
+project-chat-row:has(.gemling-checkbox) .project-chat-row-content {
+  padding-left: 0 !important;
+  margin-left: 0 !important;
+}
+
+project-chat-row .gemling-checkbox {
+  margin-left: 16px !important;
+  margin-right: 8px !important;
+  top: 1px !important;
 }
