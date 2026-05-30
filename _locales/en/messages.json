@@ -23,7 +23,7 @@
     }
   },
   "actionDone": {
-    "message": "Done ($SUCCESS$ succeeded$FAIL_MSG$)",
+    "message": "Done ($SUCCESS$$FAIL_MSG$)",
     "placeholders": {
       "SUCCESS": {
         "content": "$1"
@@ -34,7 +34,7 @@
     }
   },
   "actionFailMsg": {
-    "message": ", $FAIL$ failed",
+    "message": ", err:$FAIL$",
     "placeholders": {
       "FAIL": {
         "content": "$1"
@@ -54,5 +54,8 @@
   },
   "actionCancel": {
     "message": "Cancel"
+  },
+  "actionExport": {
+    "message": "Export PDF"
   }
 }

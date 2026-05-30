@@ -49,14 +49,50 @@ async function updateActionIcon(isEnabled) {
   }
 }
 
+// Register headers modification rule on install and startup to allow iframes
+async function registerNetRequestRules() {
+  if (chrome.declarativeNetRequest) {
+    const ruleId = 1;
+    try {
+      await chrome.declarativeNetRequest.updateDynamicRules({
+        removeRuleIds: [ruleId],
+        addRules: [{
+          id: ruleId,
+          priority: 1,
+          action: {
+            type: "modifyHeaders",
+            responseHeaders: [
+              { header: "X-Frame-Options", operation: "remove" },
+              { header: "Content-Security-Policy", operation: "remove" }
+            ]
+          },
+          condition: {
+            urlFilter: "||gemini.google.com/*",
+            resourceTypes: ["sub_frame"]
+          }
+        }]
+      });
+      console.log('[Gemling Background] Registered declarativeNetRequest rules');
+    } catch (err) {
+      console.error('[Gemling Background] Failed to register declarativeNetRequest rules:', err);
+    }
+  }
+}
+
 // On install, set default state
 chrome.runtime.onInstalled.addListener(() => {
+  registerNetRequestRules();
   chrome.storage.local.get({ isEnabled: true }, (result) => {
     updateActionIcon(result.isEnabled);
     chrome.action.setTitle({
       title: result.isEnabled ? 'Gemling (已启用)' : 'Gemling (已停用)'
     });
   });
+});
+
+// On startup, ensure rules are registered
+chrome.runtime.onStartup.addListener(() => {
+  registerNetRequestRules();
 });
 
 // Handle extension icon clicks
@@ -81,4 +117,47 @@ chrome.action.onClicked.addListener((tab) => {
       });
     });
   });
+});
+
+// Handle messages for bulk exporting and image fetching
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.action === 'open-export-tab') {
+    chrome.tabs.create({
+      url: `https://gemini.google.com/app/${message.convId}?gemling-export=true`,
+      active: true,
+      openerTabId: sender.tab ? sender.tab.id : undefined
+    }, (tab) => {
+      sendResponse({ tabId: tab.id });
+    });
+    return true; // async sendResponse
+  }
+  
+  if (message.action === 'close-tab') {
+    if (sender.tab && sender.tab.id) {
+      chrome.tabs.remove(sender.tab.id);
+    }
+  }
+
+  if (message.action === 'fetch-image') {
+    fetch(message.url)
+      .then(res => {
+        const mimeType = res.headers.get('content-type') || 'image/png';
+        return res.arrayBuffer().then(buf => ({ buf, mimeType }));
+      })
+      .then(({ buf, mimeType }) => {
+        const bytes = new Uint8Array(buf);
+        let binary = '';
+        const chunkSize = 8192;
+        for (let i = 0; i < bytes.length; i += chunkSize) {
+          const chunk = bytes.subarray(i, i + chunkSize);
+          binary += String.fromCharCode.apply(null, chunk);
+        }
+        const base64 = btoa(binary);
+        sendResponse({ status: 'success', base64: base64, mimeType: mimeType });
+      })
+      .catch(err => {
+        sendResponse({ status: 'error', error: err.message });
+      });
+    return true; // async sendResponse
+  }
 });

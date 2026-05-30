@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "__MSG_extName__",
-  "version": "1.0.1",
+  "version": "1.2",
   "description": "__MSG_extDesc__",
   "default_locale": "zh_CN",
   "icons": {
@@ -19,10 +19,13 @@
     }
   },
   "permissions": [
-    "storage"
+    "storage",
+    "declarativeNetRequest"
   ],
   "host_permissions": [
-    "https://gemini.google.com/*"
+    "https://gemini.google.com/*",
+    "https://*.googleusercontent.com/*",
+    "https://*.google.com/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -33,6 +36,7 @@
         "https://gemini.google.com/*"
       ],
       "js": [
+        "assets/lib/html2pdf.bundle.min.js",
         "content.js"
       ],
       "css": [

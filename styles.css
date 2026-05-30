@@ -176,3 +176,18 @@ project-chat-row .gemling-checkbox {
   margin-right: 8px !important;
   top: 1px !important;
 }
+
+.gemling-btn-export {
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.gemling-btn-export:hover {
+  background: #1d4ed8;
+}
+
+.gemling-btn-export:disabled {
+  background: #93c5fd;
+  cursor: not-allowed;
+}
+

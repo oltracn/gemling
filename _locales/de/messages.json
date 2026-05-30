@@ -23,7 +23,7 @@
     }
   },
   "actionDone": {
-    "message": "Fertig ($SUCCESS$ erfolgreich$FAIL_MSG$)",
+    "message": "Fertig ($SUCCESS$$FAIL_MSG$)",
     "placeholders": {
       "SUCCESS": {
         "content": "$1"
@@ -34,7 +34,7 @@
     }
   },
   "actionFailMsg": {
-    "message": ", $FAIL$ fehlgeschlagen",
+    "message": ", Fehler:$FAIL$",
     "placeholders": {
       "FAIL": {
         "content": "$1"
@@ -54,5 +54,8 @@
   },
   "actionCancel": {
     "message": "Cancel"
+  },
+  "actionExport": {
+    "message": "PDF exportieren"
   }
 }

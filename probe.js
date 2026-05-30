@@ -74,7 +74,7 @@
   window.addEventListener('gemling-request-conv-id', () => {
     function checkString(str) {
       if (str.startsWith('/app/') && str.length > 10) {
-        const match = str.match(/[/]app[/]([^/?#]+)/);
+        const match = str.match(/[/]app[/](?:c[/])?([^/?#]+)/);
         if (match) return match[1];
       }
       if (str.startsWith('c_') && str.length > 5) return str;
@@ -155,11 +155,20 @@
         });
       }
 
+      // ── Strategy 0: Direct id attribute ──
+      if (!id) {
+        const elId = snippet.getAttribute('id');
+        if (elId) {
+          const res = checkString(elId);
+          if (res) id = res;
+        }
+      }
+
       // ── Strategy 1: Inner <a href="/app/..."> ──
       if (!id) {
         const innerLink = snippet.querySelector('a[href*="/app/"]');
         if (innerLink) {
-          const hrefMatch = innerLink.getAttribute('href').match(/[/]app[/]([^/?#]+)/);
+          const hrefMatch = innerLink.getAttribute('href').match(/[/]app[/](?:c[/])?([^/?#]+)/);
           if (hrefMatch) id = hrefMatch[1];
         }
       }
@@ -170,7 +179,7 @@
           const allJslogs = snippet.querySelectorAll('[jslog]');
           for (const el of allJslogs) {
             const jslogVal = el.getAttribute('jslog');
-            const routeMatch = jslogVal.match(/[/]app[/]([a-zA-Z0-9_-]{8,})/);
+            const routeMatch = jslogVal.match(/[/]app[/](?:c[/])?([a-zA-Z0-9_-]{8,})/);
             if (routeMatch) { id = routeMatch[1]; break; }
           }
         } catch(e) {}
@@ -375,4 +384,92 @@
       return originalSend.apply(this, arguments);
     }
   };
+
+  // Universal image fetcher in MAIN world - has page's cookies & same-origin access
+  window.addEventListener('gemling-main-fetch-image', (e) => {
+    const url = e.detail.url;
+    const eventName = 'gemling-main-image-ready';
+
+    // For data: URLs, just extract directly
+    if (url.startsWith('data:')) {
+      const match = url.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
+      if (match) {
+        window.dispatchEvent(new CustomEvent(eventName, {
+          detail: { url, status: 'success', base64: match[2], mimeType: match[1] }
+        }));
+      } else {
+        window.dispatchEvent(new CustomEvent(eventName, {
+          detail: { url, status: 'error', error: 'Invalid data URL' }
+        }));
+      }
+      return;
+    }
+
+    // Try fetch first (works for blob:, https:, etc. — main world has full access)
+    fetch(url, { credentials: 'include' })
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.blob();
+      })
+      .then(blob => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const base64 = reader.result.split(',')[1];
+          window.dispatchEvent(new CustomEvent(eventName, {
+            detail: { url, status: 'success', base64, mimeType: blob.type || 'image/png' }
+          }));
+        };
+        reader.onerror = () => {
+          window.dispatchEvent(new CustomEvent(eventName, {
+            detail: { url, status: 'error', error: 'FileReader error' }
+          }));
+        };
+        reader.readAsDataURL(blob);
+      })
+      .catch(fetchErr => {
+        // Fetch failed — try finding the image in DOM and drawing it to canvas
+        console.warn('[Gemling Probe] Main world fetch failed for', url, fetchErr.message, '— trying canvas');
+        try {
+          const imgs = document.querySelectorAll('img');
+          let targetImg = null;
+          for (const img of imgs) {
+            if (img.src === url || img.getAttribute('src') === url) {
+              targetImg = img;
+              break;
+            }
+          }
+          if (targetImg && targetImg.complete && targetImg.naturalWidth > 0) {
+            const canvas = document.createElement('canvas');
+            canvas.width = targetImg.naturalWidth;
+            canvas.height = targetImg.naturalHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(targetImg, 0, 0);
+            const dataUrl = canvas.toDataURL('image/png');
+            const base64 = dataUrl.split(',')[1];
+            window.dispatchEvent(new CustomEvent(eventName, {
+              detail: { url, status: 'success', base64, mimeType: 'image/png' }
+            }));
+            return;
+          }
+        } catch (canvasErr) {
+          console.warn('[Gemling Probe] Canvas fallback also failed:', canvasErr.message);
+        }
+        window.dispatchEvent(new CustomEvent(eventName, {
+          detail: { url, status: 'error', error: fetchErr.message }
+        }));
+      });
+  });
+
+  // Keep legacy event name for backward compatibility
+  window.addEventListener('gemling-main-fetch-blob', (e) => {
+    window.dispatchEvent(new CustomEvent('gemling-main-fetch-image', { detail: e.detail }));
+    // Bridge old response event name
+    const handler = (ev) => {
+      if (ev.detail.url === e.detail.url) {
+        window.removeEventListener('gemling-main-image-ready', handler);
+        window.dispatchEvent(new CustomEvent('gemling-main-blob-ready', { detail: ev.detail }));
+      }
+    };
+    window.addEventListener('gemling-main-image-ready', handler);
+  });
 })();

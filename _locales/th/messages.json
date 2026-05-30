@@ -23,7 +23,7 @@
     }
   },
   "actionDone": {
-    "message": "เสร็จสิ้น (สำเร็จ $SUCCESS$ รายการ$FAIL_MSG$)",
+    "message": "เสร็จสิ้น ($SUCCESS$$FAIL_MSG$)",
     "placeholders": {
       "SUCCESS": {
         "content": "$1"
@@ -34,7 +34,7 @@
     }
   },
   "actionFailMsg": {
-    "message": ", ล้มเหลว $FAIL$ รายการ",
+    "message": ", ล้มเหลว:$FAIL$",
     "placeholders": {
       "FAIL": {
         "content": "$1"
@@ -54,5 +54,8 @@
   },
   "actionCancel": {
     "message": "Cancel"
+  },
+  "actionExport": {
+    "message": "ส่งออก PDF"
   }
 }
