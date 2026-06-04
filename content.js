@@ -1166,10 +1166,11 @@
 
     const tagName = node.tagName.toLowerCase();
     
-    // Skip code actions, hidden buttons or copy buttons
+    // Skip code actions, hidden buttons or copy buttons.
+    // Allow buttons that contain images (e.g. Gemini's generated image gallery buttons)
     if (node.classList.contains('code-actions-container') || 
         node.querySelector('.copy-code-button') ||
-        tagName === 'button' ||
+        (tagName === 'button' && !node.querySelector('img')) ||
         node.style.display === 'none') {
       return '';
     }
@@ -1299,7 +1300,9 @@
           if (userQueryTurn) {
             const imgs = userQueryTurn.querySelectorAll('img');
             imgs.forEach(img => {
-              if (img.closest('user-query-content')) return;
+              // Ensure we only process images inside THIS user-query-content, or images that are completely outside any user-query-content
+              const closestContent = img.closest('user-query-content');
+              if (closestContent && closestContent !== el) return;
 
               const src = img.getAttribute('src') || '';
               if (img.classList.contains('avatar') || img.classList.contains('profile-img') || img.classList.contains('user-avatar') || src.includes('/a/') || src.includes('/a-/')) return;
@@ -1358,10 +1361,12 @@
       const exportContext = { convId: cleanId, images: [] };
       const markdown = extractMessages(document, exportContext);
       
+      console.log('[Gemling] ExportContext images found (foreground):', exportContext.images.length);
       const fetchedImages = [];
       for (let i = 0; i < exportContext.images.length; i++) {
         const imgInfo = exportContext.images[i];
         const filename = `images/${cleanId}_${i + 1}.${imgInfo.ext}`;
+        console.log(`[Gemling] Fetching image (foreground) ${i+1}/${exportContext.images.length}:`, imgInfo.src);
         try {
           const { base64, mimeType } = await fetchImageAsBase64(imgInfo.src, imgInfo.element);
           fetchedImages.push({
@@ -1369,10 +1374,12 @@
             base64: base64,
             mimeType: mimeType
           });
+          console.log(`[Gemling] Successfully fetched image ${i+1} (foreground)`);
         } catch (fetchErr) {
-          console.error('[Gemling] Failed to fetch image:', imgInfo.src, fetchErr);
+          console.error('[Gemling] Failed to fetch image (foreground):', imgInfo.src, fetchErr);
         }
       }
+      console.log(`[Gemling] Successfully fetched ${fetchedImages.length} out of ${exportContext.images.length} images (foreground)`);
       const title = getConversationTitleFromPage() || convId;
       return { markdown: markdown, images: fetchedImages, title: title };
     }
@@ -1417,17 +1424,23 @@
       .replace(/"/g, '&quot;');
   }
 
-  function inlineMarkdownToHtml(text) {
+  function inlineMarkdownToHtml(text, imageMap) {
     text = escapeHtml(text);
     text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
     text = text.replace(/\*(.+?)\*/g, '<em>$1</em>');
     text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
+    // Handle images BEFORE links (![alt](src) contains [alt](src) which the link regex would match)
+    text = text.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (match, alt, src) => {
+      if (imageMap && imageMap[src]) {
+        return `<img src="${imageMap[src]}" alt="${alt}" style="max-width:100%;height:auto;margin:8px 0;display:block;">`;
+      }
+      return '';
+    });
     text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
-    text = text.replace(/!\[.*?\]\(.*?\)/g, '');
     return text;
   }
 
-  function markdownBlockToHtml(mdText) {
+  function markdownBlockToHtml(mdText, imageMap) {
     let html = '';
     const lines = mdText.split('\n');
     let inCodeBlock = false;
@@ -1460,7 +1473,7 @@
       if (headingMatch) {
         if (inList) { html += listType === 'ul' ? '</ul>\n' : '</ol>\n'; inList = false; }
         const level = Math.min(headingMatch[1].length + 1, 6); // offset by 1 since h1 is conv title
-        html += `<h${level}>${inlineMarkdownToHtml(headingMatch[2])}</h${level}>\n`;
+        html += `<h${level}>${inlineMarkdownToHtml(headingMatch[2], imageMap)}</h${level}>\n`;
         continue;
       }
 
@@ -1469,7 +1482,7 @@
           if (inList) html += listType === 'ul' ? '</ul>\n' : '</ol>\n';
           html += '<ul>\n'; inList = true; listType = 'ul';
         }
-        html += `<li>${inlineMarkdownToHtml(line.replace(/^\* /, ''))}</li>\n`;
+        html += `<li>${inlineMarkdownToHtml(line.replace(/^\* /, ''), imageMap)}</li>\n`;
         continue;
       }
       if (line.match(/^\d+\. /)) {
@@ -1477,13 +1490,13 @@
           if (inList) html += listType === 'ul' ? '</ul>\n' : '</ol>\n';
           html += '<ol>\n'; inList = true; listType = 'ol';
         }
-        html += `<li>${inlineMarkdownToHtml(line.replace(/^\d+\. /, ''))}</li>\n`;
+        html += `<li>${inlineMarkdownToHtml(line.replace(/^\d+\. /, ''), imageMap)}</li>\n`;
         continue;
       }
 
       if (line.startsWith('> ')) {
         if (inList) { html += listType === 'ul' ? '</ul>\n' : '</ol>\n'; inList = false; }
-        html += `<blockquote><p>${inlineMarkdownToHtml(line.substring(2))}</p></blockquote>\n`;
+        html += `<blockquote><p>${inlineMarkdownToHtml(line.substring(2), imageMap)}</p></blockquote>\n`;
         continue;
       }
 
@@ -1494,7 +1507,7 @@
         const isHeader = nextLine.match(/^\|[\s\-:|]+\|$/);
         const tag = isHeader ? 'th' : 'td';
         if (isHeader) html += '<table><thead>\n';
-        html += '<tr>' + cells.map(c => `<${tag}>${inlineMarkdownToHtml(c)}</${tag}>`).join('') + '</tr>\n';
+        html += '<tr>' + cells.map(c => `<${tag}>${inlineMarkdownToHtml(c, imageMap)}</${tag}>`).join('') + '</tr>\n';
         if (isHeader) { html += '</thead><tbody>\n'; }
         const afterSep = isHeader ? i + 2 : i + 1;
         if (afterSep >= lines.length || !lines[afterSep].startsWith('|')) {
@@ -1503,8 +1516,20 @@
         continue;
       }
 
+      // Handle image lines: ![alt](path)
+      const imgLineMatch = line.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
+      if (imgLineMatch) {
+        if (inList) { html += listType === 'ul' ? '</ul>\n' : '</ol>\n'; inList = false; }
+        const imgAlt = imgLineMatch[1];
+        const imgSrc = imgLineMatch[2];
+        if (imageMap && imageMap[imgSrc]) {
+          html += `<div class="image-container"><img src="${imageMap[imgSrc]}" alt="${escapeHtml(imgAlt)}"></div>\n`;
+        }
+        continue;
+      }
+
       if (inList) { html += listType === 'ul' ? '</ul>\n' : '</ol>\n'; inList = false; }
-      html += `<p>${inlineMarkdownToHtml(line)}</p>\n`;
+      html += `<p>${inlineMarkdownToHtml(line, imageMap)}</p>\n`;
     }
 
     if (inList) html += listType === 'ul' ? '</ul>\n' : '</ol>\n';
@@ -1526,6 +1551,15 @@
 
   function buildSinglePdfHtml(conv) {
     const messages = parseConversationMarkdown(conv.markdown);
+
+    // Build image lookup map: filename -> data URI
+    const imageMap = {};
+    if (conv.images && conv.images.length > 0) {
+      for (const img of conv.images) {
+        imageMap[img.filename] = `data:${img.mimeType};base64,${img.base64}`;
+      }
+    }
+
     let conversationsHtml = `<div class="conversation">\n`;
     conversationsHtml += `<div class="conv-header">\n`;
     conversationsHtml += `  <h1 class="conv-title">${escapeHtml(conv.title)}</h1>\n`;
@@ -1534,17 +1568,27 @@
 
     for (const msg of messages) {
       if (msg.role === 'user') {
+        // Extract image references before stripping for text display
+        const userImgRefs = [...msg.content.matchAll(/!\[([^\]]*)\]\(([^)]+)\)/g)];
         let text = msg.content.replace(/!\[.*?\]\(.*?\)/g, '').trim();
         const truncated = text.length > 100;
         if (truncated) text = text.substring(0, 100);
         conversationsHtml += `<div class="message message-user">\n`;
         conversationsHtml += `  <div class="role-label">👤 User</div>\n`;
-        conversationsHtml += `  <div class="message-content"><p>${escapeHtml(text)}${truncated ? '<span class="truncated">…</span>' : ''}</p></div>\n`;
+        conversationsHtml += `  <div class="message-content"><p>${escapeHtml(text)}${truncated ? '<span class="truncated">…</span>' : ''}</p>`;
+        // Render user-uploaded images
+        for (const imgRef of userImgRefs) {
+          const imgSrc = imgRef[2];
+          if (imageMap[imgSrc]) {
+            conversationsHtml += `<div class="user-images"><img src="${imageMap[imgSrc]}" alt="${escapeHtml(imgRef[1])}"></div>`;
+          }
+        }
+        conversationsHtml += `</div>\n`;
         conversationsHtml += `</div>\n`;
       } else {
         conversationsHtml += `<div class="message message-gemini">\n`;
         conversationsHtml += `  <div class="role-label">✨ Gemini</div>\n`;
-        conversationsHtml += `  <div class="message-content">${markdownBlockToHtml(msg.content)}</div>\n`;
+        conversationsHtml += `  <div class="message-content">${markdownBlockToHtml(msg.content, imageMap)}</div>\n`;
         conversationsHtml += `</div>\n`;
       }
     }
@@ -1583,6 +1627,10 @@ th, td { border: 1px solid #000; padding: 5px 10px; text-align: left; }
 ul, ol { padding-left: 25px; margin: 10px 0; }
 a { color: #000; text-decoration: underline; }
 .truncated { color: #666; }
+.image-container { margin: 10px 0; text-align: center; }
+.image-container img { max-width: 100%; height: auto; }
+.user-images { margin: 8px 0; }
+.user-images img { max-width: 300px; height: auto; border-radius: 4px; }
 </style>
 </head>
 <body>
@@ -1600,11 +1648,17 @@ ${conversationsHtml}
         return;
       }
 
-      const container = document.createElement('div');
-      container.style.position = 'absolute';
-      container.style.left = '-9999px';
-      container.innerHTML = htmlString;
-      document.body.appendChild(container);
+      const iframe = document.createElement('iframe');
+      iframe.style.position = 'absolute';
+      iframe.style.width = '800px';
+      iframe.style.height = '600px';
+      iframe.style.left = '-9999px';
+      document.body.appendChild(iframe);
+      
+      const doc = iframe.contentWindow.document;
+      doc.open();
+      doc.write(htmlString);
+      doc.close();
 
       const opt = {
         margin:       10,
@@ -1614,13 +1668,15 @@ ${conversationsHtml}
         jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
       };
 
-      html2pdf().set(opt).from(container.querySelector('.content')).output('blob')
+      const contentEl = doc.querySelector('.content') || doc.body;
+
+      html2pdf().set(opt).from(contentEl).output('blob')
         .then(blob => {
-          document.body.removeChild(container);
+          document.body.removeChild(iframe);
           resolve(blob);
         })
         .catch(err => {
-          document.body.removeChild(container);
+          document.body.removeChild(iframe);
           reject(err);
         });
     });
@@ -1653,8 +1709,13 @@ ${conversationsHtml}
       btnExport.textContent = chrome.i18n.getMessage("actionProcessing", [current, total]);
 
       try {
-        const { markdown, title: fetchedTitle } = await getConversationContent(convId);
-        const title = fetchedTitle || getConversationTitle(convId) || convId;
+        const { markdown, images: fetchedImages, title: fetchedTitle } = await getConversationContent(convId);
+        
+        let listTitle = getConversationTitle(convId);
+        let title = (listTitle && listTitle !== convId) ? listTitle : fetchedTitle;
+        if (!title || title === convId) {
+          title = convId;
+        }
         
         let safeTitle = title.replace(/[\\\/:\*\?"<>\|]/g, '_').trim();
         if (!safeTitle || safeTitle === '_' || safeTitle === '..') {
@@ -1668,12 +1729,16 @@ ${conversationsHtml}
           counter++;
         }
 
-        const htmlStr = buildSinglePdfHtml({ title, markdown, date: dateStr });
+        // Add images as separate files in the ZIP first, so we don't lose them if PDF generation fails
+        if (fetchedImages && fetchedImages.length > 0) {
+          for (const img of fetchedImages) {
+            zip.addFile(img.filename, img.base64, true);
+          }
+        }
+
+        const htmlStr = buildSinglePdfHtml({ title, markdown, date: dateStr, images: fetchedImages });
         const pdfBlob = await generatePdfBlob(htmlStr);
         
-        // zip.addFile takes either a string (for text) or base64 (for binary when 3rd arg is true).
-        // ZipBuilder in content.js accepts base64 when the third param is true.
-        // We need to convert blob to base64.
         const base64 = await blobToBase64(pdfBlob);
         zip.addFile(filename, base64, true);
 
@@ -1755,21 +1820,26 @@ ${conversationsHtml}
           const markdown = extractMessages(document, exportContext);
           const title = getConversationTitleFromPage() || convId;
           
-          const fetchedImages = [];
-          for (let i = 0; i < exportContext.images.length; i++) {
-            const imgInfo = exportContext.images[i];
-            const filename = `images/${convId}_${i + 1}.${imgInfo.ext}`;
-            try {
-              const { base64, mimeType } = await fetchImageAsBase64(imgInfo.src, imgInfo.element);
-              fetchedImages.push({
-                filename: filename,
-                base64: base64,
-                mimeType: mimeType
-              });
-            } catch (fetchErr) {
-              console.error('[Gemling] Failed to fetch image:', imgInfo.src, fetchErr);
+            console.log('[Gemling] ExportContext images found:', exportContext.images.length);
+            
+            const fetchedImages = [];
+            for (let i = 0; i < exportContext.images.length; i++) {
+              const imgInfo = exportContext.images[i];
+              const filename = `images/${convId}_${i + 1}.${imgInfo.ext}`;
+              console.log(`[Gemling] Fetching image ${i+1}/${exportContext.images.length}:`, imgInfo.src);
+              try {
+                const { base64, mimeType } = await fetchImageAsBase64(imgInfo.src, imgInfo.element);
+                fetchedImages.push({
+                  filename: filename,
+                  base64: base64,
+                  mimeType: mimeType
+                });
+                console.log(`[Gemling] Successfully fetched image ${i+1}`);
+              } catch (fetchErr) {
+                console.error('[Gemling] Failed to fetch image:', imgInfo.src, fetchErr);
+              }
             }
-          }
+            console.log(`[Gemling] Successfully fetched ${fetchedImages.length} out of ${exportContext.images.length} images`);
           
           chrome.storage.local.set({
             [storageKey]: {
