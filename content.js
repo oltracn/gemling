@@ -96,7 +96,28 @@
     window.addEventListener('gemling-api-captured-raw', (e) => {
       if (isBulkDeleteActive && awaitDeleteConvId) {
         const { url, sourcePathRaw, bodyTemplate } = e.detail;
-        if (bodyTemplate && bodyTemplate.includes(awaitDeleteConvId)) {
+
+        // 确保捕获的是删除 RPC（通常包含 qWymEb 或 hXkFw）
+        let isDeleteRpc = false;
+        try {
+          const u = new URL(url, window.location.origin);
+          const rpcids = u.searchParams.get('rpcids') || '';
+          if (rpcids.includes('qWymEb') || rpcids.includes('hXkFw')) {
+            isDeleteRpc = true;
+          }
+        } catch (err) {
+          if (url.includes('qWymEb') || url.includes('hXkFw')) {
+            isDeleteRpc = true;
+          }
+        }
+
+        if (!isDeleteRpc) {
+          console.log('[Gemling] 忽略非删除 API 请求:', url);
+          return;
+        }
+
+        const rawId = awaitDeleteConvId.startsWith('c_') ? awaitDeleteConvId.substring(2) : awaitDeleteConvId;
+        if (bodyTemplate && (bodyTemplate.includes(awaitDeleteConvId) || bodyTemplate.includes(rawId))) {
           apiStateDelete = { url, sourcePathRaw, bodyTemplate, originalConvId: awaitDeleteConvId };
           console.log(`[Gemling] Delete API 已捕获: convId=${awaitDeleteConvId}`);
         }
@@ -494,14 +515,14 @@
 
     btnDelete.disabled = true;
     isBulkDeleteActive = true;
-    apiStateDelete = null;
 
-    const firstConvId = checkedConversationIds.values().next().value;
-    if (!firstConvId) {
+    const convIds = Array.from(checkedConversationIds);
+    if (convIds.length === 0) {
       btnDelete.disabled = false;
       return;
     }
 
+    const firstConvId = convIds[0];
     const firstItem = findConversationItem(firstConvId);
     if (!firstItem) {
       console.error('[Gemling] 未找到对话项:', firstConvId);
@@ -509,50 +530,65 @@
       return;
     }
 
-    awaitDeleteConvId = normalizeConversationId(firstConvId) || firstConvId;
-    btnDelete.textContent = "..."; // Processing indication
+    // ── Step 1: First conversation - user manually confirms (safety check) ──
+    btnDelete.textContent = "...";
     triggerNativeDelete(firstItem);
 
-    // Wait for dialog to appear and then disappear
-    const confirmed = await waitForDialogAndCaptureDelete();
-    if (!confirmed || !apiStateDelete) {
-      // User cancelled
+    const userConfirmed = await waitForDialogUserConfirm();
+    if (!userConfirmed) {
+      // User cancelled the dialog
       handleCancelBulk();
       return;
     }
 
-    // First one deleted via UI, proceed to delete rest via API
+    // First item deleted via native UI
     checkedConversationIds.delete(firstConvId);
-    if (firstItem) {
-      const firstItemToRemove = firstItem.closest('gem-nav-list-item') || firstItem.closest('project-chat-row') || firstItem.closest('li') || firstItem;
-      firstItemToRemove.remove();
-    }
+    const firstItemToRemove = firstItem.closest('gem-nav-list-item') || firstItem.closest('project-chat-row') || firstItem.closest('li') || firstItem;
+    firstItemToRemove.remove();
 
-    const convIds = Array.from(checkedConversationIds);
     let successCount = 1;
     let failCount = 0;
 
-    for (let i = 0; i < convIds.length; i++) {
+    // ── Step 2: Remaining conversations - native UI with auto-confirm ──
+    for (let i = 1; i < convIds.length; i++) {
       const convId = convIds[i];
-      const current = (i + 2).toString();
-      const total = (convIds.length + 1).toString();
+      const current = (i + 1).toString();
+      const total = convIds.length.toString();
       btnDelete.textContent = chrome.i18n.getMessage("actionProcessing", [current, total]);
 
+      const item = findConversationItem(convId);
+      if (!item) {
+        console.warn('[Gemling] 未找到对话项，跳过:', convId);
+        failCount++;
+        continue;
+      }
+
+      console.log(`[Gemling] Auto-deleting ${current}/${total}: ${convId}`);
+
       try {
-        await deleteViaApi(convId);
-        successCount++;
-        const item = findConversationItem(convId);
-        if (item) {
+        // Trigger native delete menu
+        triggerNativeDelete(item);
+
+        // Auto-click confirm button in the dialog
+        const deleted = await autoConfirmDeleteDialog();
+        if (deleted) {
+          successCount++;
           const itemToRemove = item.closest('gem-nav-list-item') || item.closest('project-chat-row') || item.closest('li') || item;
           itemToRemove.remove();
+          checkedConversationIds.delete(convId);
+        } else {
+          console.error('[Gemling] Auto-confirm failed for:', convId);
+          failCount++;
         }
-        checkedConversationIds.delete(convId);
       } catch (err) {
         console.error('[Gemling] 删除失败:', convId, err);
         failCount++;
       }
 
-      await delay(1500);
+      // Wait between deletions to avoid rate limiting
+      if (i < convIds.length - 1) {
+        await delay(1500);
+      }
     }
 
     const failMsg = failCount > 0 ? chrome.i18n.getMessage("actionFailMsg", [failCount.toString()]) : '';
@@ -634,22 +670,162 @@
     pollAndClickMenu(['删除', 'Delete', 'delete']);
   }
 
-  function waitForDialogAndCaptureDelete() {
+  // Helper: find a visible dialog in the DOM
+  function findVisibleDialog() {
+    const dialogs = document.querySelectorAll('mat-dialog-container, mdc-dialog, .mat-mdc-dialog-container, dialog[open], [role="dialog"]');
+    for (const d of dialogs) {
+      if (d.offsetWidth > 0 || d.offsetHeight > 0 || d.hasAttribute('open')) {
+        return d;
+      }
+    }
+    return null;
+  }
+
+  // Wait for user to manually confirm the delete dialog (first deletion only)
+  function waitForDialogUserConfirm() {
     return new Promise(resolve => {
       let dialogAppeared = false;
+      const startTime = Date.now();
+
       const checkInterval = setInterval(() => {
-        const dialog = document.querySelector('mat-dialog-container');
-        if (dialog) {
-          dialogAppeared = true;
-        } else if (dialogAppeared && !dialog) {
+        if (Date.now() - startTime > 30000) {
           clearInterval(checkInterval);
-          // Wait a bit to ensure API request fires and is captured
-          setTimeout(() => {
-            resolve(!!apiStateDelete);
-          }, 500);
+          console.log('[Gemling] waitForDialogUserConfirm timeout (30s)');
+          resolve(false);
+          return;
+        }
+
+        const visibleDialog = findVisibleDialog();
+        if (visibleDialog) {
+          dialogAppeared = true;
+        } else if (dialogAppeared) {
+          clearInterval(checkInterval);
+          console.log('[Gemling] User confirmed first delete dialog');
+          // Small delay to let the delete request complete
+          setTimeout(() => resolve(true), 500);
         }
       }, 200);
     });
+  }
+
+  // Auto-confirm the delete dialog (for subsequent deletions)
+  function autoConfirmDeleteDialog() {
+    return new Promise(resolve => {
+      let dialogAppeared = false;
+      let confirmClicked = false;
+      const startTime = Date.now();
+
+      const checkInterval = setInterval(() => {
+        if (Date.now() - startTime > 15000) {
+          clearInterval(checkInterval);
+          console.error('[Gemling] autoConfirmDeleteDialog timeout (15s)');
+          resolve(false);
+          return;
+        }
+
+        const visibleDialog = findVisibleDialog();
+
+        if (visibleDialog && !dialogAppeared) {
+          dialogAppeared = true;
+          console.log('[Gemling] Auto-confirm dialog appeared');
+
+          // Wait a brief moment, then find and click the confirm button
+          setTimeout(() => {
+            const confirmBtn = findConfirmButton(visibleDialog);
+            if (confirmBtn) {
+              console.log('[Gemling] Clicking confirm button:', confirmBtn.textContent.trim());
+              confirmBtn.click();
+              confirmClicked = true;
+            } else {
+              console.error('[Gemling] Could not find confirm button in dialog');
+              // Try clicking any button that's not a cancel
+              const fallbackBtn = findConfirmButtonFallback(visibleDialog);
+              if (fallbackBtn) {
+                console.log('[Gemling] Clicking fallback button:', fallbackBtn.textContent.trim());
+                fallbackBtn.click();
+                confirmClicked = true;
+              }
+            }
+          }, 300);
+        } else if (dialogAppeared && !visibleDialog) {
+          // Dialog closed
+          clearInterval(checkInterval);
+          if (confirmClicked) {
+            console.log('[Gemling] Auto-confirm dialog closed successfully');
+            setTimeout(() => resolve(true), 300);
+          } else {
+            resolve(false);
+          }
+        }
+      }, 150);
+    });
+  }
+
+  // Find the confirm/delete button inside a dialog
+  function findConfirmButton(dialog) {
+    const buttons = dialog.querySelectorAll('button');
+    const deleteKeywords = ['删除', 'delete', 'remove', '确认', 'confirm', 'ok'];
+    const cancelKeywords = ['取消', 'cancel', '关闭', 'close', 'dismiss'];
+
+    for (const btn of buttons) {
+      const text = (btn.textContent || '').trim().toLowerCase();
+      if (text.length === 0) continue;
+
+      // Check if it matches a delete/confirm keyword and NOT a cancel keyword
+      const isConfirm = deleteKeywords.some(kw => text.includes(kw));
+      const isCancel = cancelKeywords.some(kw => text.includes(kw));
+
+      if (isConfirm && !isCancel) {
+        return btn;
+      }
+    }
+    return null;
+  }
+
+  // Fallback: find the primary/danger/colored button (usually the confirm action)
+  function findConfirmButtonFallback(dialog) {
+    const buttons = Array.from(dialog.querySelectorAll('button'));
+    const cancelKeywords = ['取消', 'cancel', '关闭', 'close', 'dismiss'];
+
+    // Filter out cancel buttons
+    const nonCancelBtns = buttons.filter(btn => {
+      const text = (btn.textContent || '').trim().toLowerCase();
+      return text.length > 0 && !cancelKeywords.some(kw => text.includes(kw));
+    });
+
+    // Prefer buttons with warn/danger/primary class
+    for (const btn of nonCancelBtns) {
+      const cls = (btn.className || '').toLowerCase();
+      if (cls.includes('warn') || cls.includes('danger') || cls.includes('primary') || cls.includes('affirmative')) {
+        return btn;
+      }
+    }
+
+    // Return the last non-cancel button (usually the action button is on the right)
+    return nonCancelBtns.length > 0 ? nonCancelBtns[nonCancelBtns.length - 1] : null;
+  }
+
+  function replaceConvIdInObject(obj, target, replacement) {
+    if (!obj) return obj;
+    if (typeof obj === 'string') {
+      if (obj === target) return replacement;
+      const targetRaw = target.startsWith('c_') ? target.substring(2) : target;
+      const replacementRaw = replacement.startsWith('c_') ? replacement.substring(2) : replacement;
+      if (obj === targetRaw) return replacementRaw;
+      return obj.replace(new RegExp(target, 'g'), replacement)
+                .replace(new RegExp(targetRaw, 'g'), replacementRaw);
+    }
+    if (Array.isArray(obj)) {
+      return obj.map(item => replaceConvIdInObject(item, target, replacement));
+    }
+    if (typeof obj === 'object') {
+      const result = {};
+      for (const key in obj) {
+        result[key] = replaceConvIdInObject(obj[key], target, replacement);
+      }
+      return result;
+    }
+    return obj;
   }
 
   async function deleteViaApi(convId) {
@@ -661,29 +837,15 @@
       throw new Error('缺少 API 状态');
     }
 
-    const params = new URLSearchParams(apiStateDelete.bodyTemplate);
-    const fReq = params.get('f.req');
-    let parsed;
-    let inner;
-    try {
-      parsed = JSON.parse(fReq);
-      inner = JSON.parse(parsed[0][0][1]);
-    } catch (err) {
-      throw new Error(`解析捕获请求失败: ${err.message}`);
-    }
-
-    // Replace ID within inner
     const originalConvId = apiStateDelete.originalConvId;
     const originalRaw = originalConvId.startsWith('c_') ? originalConvId.substring(2) : originalConvId;
     const targetRaw = normalizedConvId.startsWith('c_') ? normalizedConvId.substring(2) : normalizedConvId;
-    
-    let innerStr = JSON.stringify(inner);
-    innerStr = innerStr.replace(new RegExp(originalConvId, 'g'), normalizedConvId);
-    innerStr = innerStr.replace(new RegExp(originalRaw, 'g'), targetRaw);
 
-    parsed[0][0][1] = innerStr;
-    params.set('f.req', JSON.stringify(parsed));
-    const bodyText = params.toString();
+    let bodyText = apiStateDelete.bodyTemplate;
+    
+    // Globally replace the exact strings
+    bodyText = bodyText.replace(new RegExp(originalConvId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), normalizedConvId);
+    bodyText = bodyText.replace(new RegExp(originalRaw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), targetRaw);
 
     let sourcePath = apiStateDelete.sourcePathRaw || '';
     if (sourcePath.includes(originalRaw)) {
@@ -694,24 +856,34 @@
     const bl = capturedUrl.searchParams.get('bl') || '';
     const fSid = capturedUrl.searchParams.get('f.sid') || '';
     const hl = capturedUrl.searchParams.get('hl') || 'zh-CN';
+    const rpcids = capturedUrl.searchParams.get('rpcids') || 'qWymEb';
 
     const reqid = Math.floor(Math.random() * 9000000) + 1000000;
-    const url = `/_/BardChatUi/data/batchexecute?rpcids=hXkFw&source-path=${sourcePath}&bl=${bl}&f.sid=${fSid}&hl=${hl}&_reqid=${reqid}&rt=c`;
+    const url = `/_/BardChatUi/data/batchexecute?rpcids=${rpcids}&source-path=${sourcePath}&bl=${bl}&f.sid=${fSid}&hl=${hl}&_reqid=${reqid}&rt=c`;
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8'
-      },
-      body: bodyText,
-      credentials: 'same-origin'
+    console.log('[Gemling Debug] Sending delete request:', {
+      url,
+      bodyText,
+      targetConvId: normalizedConvId
     });
+    try {
+      const params = new URLSearchParams(bodyText);
+      const fReq = params.get('f.req');
+      if (fReq) {
+        console.log('[Gemling Debug Detail] Extension Delete Request - parsed f.req:', JSON.stringify(JSON.parse(fReq), null, 2));
+      }
+    } catch (err) {}
+
+    const response = await fetchInMainWorld(url, bodyText);
+
+    console.log('[Gemling Debug] Delete response status:', response.status);
 
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
     }
 
     const text = await response.text();
+    console.log('[Gemling Debug] Delete response body:', text);
     const jsonText = text.replace(/^\)\]\}'\s*\n?/, '');
     
     if (!jsonText.includes('wrb.fr') || jsonText.includes('"er",')) {
@@ -844,23 +1016,17 @@
     const bl = capturedUrl.searchParams.get('bl') || '';
     const fSid = capturedUrl.searchParams.get('f.sid') || '';
     const hl = capturedUrl.searchParams.get('hl') || 'zh-CN';
+    const rpcids = capturedUrl.searchParams.get('rpcids') || 'MUAZcd';
 
     // 生成新的 _reqid（随机数）
     const reqid = Math.floor(Math.random() * 9000000) + 1000000;
 
-    const url = `/_/BardChatUi/data/batchexecute?rpcids=MUAZcd&source-path=${sourcePath}&bl=${bl}&f.sid=${fSid}&hl=${hl}&_reqid=${reqid}&rt=c`;
+    const url = `/_/BardChatUi/data/batchexecute?rpcids=${rpcids}&source-path=${sourcePath}&bl=${bl}&f.sid=${fSid}&hl=${hl}&_reqid=${reqid}&rt=c`;
 
     console.log('[Gemling] 发送请求到:', url);
     console.log('[Gemling] 请求体:', bodyText.substring(0, 100));
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8'
-      },
-      body: bodyText,
-      credentials: 'same-origin'
-    });
+    const response = await fetchInMainWorld(url, bodyText);
 
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
@@ -1885,6 +2051,33 @@ ${conversationsHtml}
 
   function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  function fetchInMainWorld(url, body) {
+    return new Promise((resolve, reject) => {
+      const actionId = Math.random().toString(36).substring(2);
+      
+      const handler = (e) => {
+        if (e.detail.actionId === actionId) {
+          window.removeEventListener('gemling-main-fetch-response', handler);
+          if (e.detail.ok) {
+            resolve({
+              ok: true,
+              status: e.detail.status,
+              text: () => Promise.resolve(e.detail.text)
+            });
+          } else {
+            reject(new Error(e.detail.error || `HTTP ${e.detail.status}`));
+          }
+        }
+      };
+
+      window.addEventListener('gemling-main-fetch-response', handler);
+
+      window.dispatchEvent(new CustomEvent('gemling-main-fetch', {
+        detail: { url, body, actionId }
+      }));
+    });
   }
 
   async function fetchImageAsBase64(url, imgElement) {

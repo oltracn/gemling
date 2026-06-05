@@ -1,4 +1,22 @@
 (function() {
+  function logDeleteReqDetails(tag, url, bodyText) {
+    try {
+      const params = new URLSearchParams(bodyText);
+      const fReq = params.get('f.req');
+      const at = params.get('at');
+      if (fReq) {
+        const parsed = JSON.parse(fReq);
+        console.log(`[Gemling Debug Detail] ${tag} - URL:`, url);
+        console.log(`[Gemling Debug Detail] ${tag} - parsed f.req:`, JSON.stringify(parsed, null, 2));
+        console.log(`[Gemling Debug Detail] ${tag} - at token:`, at);
+      } else {
+        console.log(`[Gemling Debug Detail] ${tag} - Raw body:`, bodyText);
+      }
+    } catch (err) {
+      console.error(`[Gemling Debug Detail] ${tag} - Parse error:`, err, bodyText);
+    }
+  }
+
   let overrideConvId = null;
   window.addEventListener('gemling-set-override-convid', (e) => {
     overrideConvId = e.detail.convId;
@@ -7,6 +25,57 @@
   let overrideDeleteData = null;
   window.addEventListener('gemling-set-override-delete', (e) => {
     overrideDeleteData = e.detail;
+  });
+
+  // Save original XHR methods BEFORE any overrides are applied
+  const _origOpen = XMLHttpRequest.prototype.open;
+  const _origSend = XMLHttpRequest.prototype.send;
+  const _origSetHeader = XMLHttpRequest.prototype.setRequestHeader;
+
+  window.addEventListener('gemling-main-fetch', (e) => {
+    const { url, body, actionId } = e.detail;
+    try {
+      const xhr = new XMLHttpRequest();
+
+      // Call the ORIGINAL (un-overridden) methods directly
+      _origOpen.call(xhr, 'POST', url, true);
+
+      // Set headers - merge captured native headers
+      const headers = {
+        'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8',
+        'X-Same-Domain': '1'
+      };
+      if (window.gemlingLastDeleteHeaders) {
+        Object.assign(headers, window.gemlingLastDeleteHeaders);
+        console.log('[Gemling Main XHR] Using headers:', Object.keys(headers).join(', '));
+      }
+      for (const [key, value] of Object.entries(headers)) {
+        _origSetHeader.call(xhr, key, value);
+      }
+
+      xhr.withCredentials = true;
+
+      xhr.onload = function() {
+        console.log('[Gemling Main XHR] Response:', xhr.status, xhr.responseText.substring(0, 200));
+        window.dispatchEvent(new CustomEvent('gemling-main-fetch-response', {
+          detail: { actionId, status: xhr.status, ok: xhr.status >= 200 && xhr.status < 300, text: xhr.responseText }
+        }));
+      };
+
+      xhr.onerror = function() {
+        window.dispatchEvent(new CustomEvent('gemling-main-fetch-response', {
+          detail: { actionId, ok: false, error: 'XHR network error' }
+        }));
+      };
+
+      // Send using the ORIGINAL send method - completely bypasses our interceptor
+      _origSend.call(xhr, body);
+    } catch (err) {
+      console.error('[Gemling Main XHR] Error:', err);
+      window.dispatchEvent(new CustomEvent('gemling-main-fetch-response', {
+        detail: { actionId, ok: false, error: err.message }
+      }));
+    }
   });
 
   // ── API Response Data: title → convId mapping ──
@@ -281,6 +350,13 @@
   // ── XHR Override ──
   const originalOpen = XMLHttpRequest.prototype.open;
   const originalSend = XMLHttpRequest.prototype.send;
+  const originalSetRequestHeader = XMLHttpRequest.prototype.setRequestHeader;
+
+  XMLHttpRequest.prototype.setRequestHeader = function(header, value) {
+    if (!this._gemlingHeaders) this._gemlingHeaders = {};
+    this._gemlingHeaders[header] = value;
+    return originalSetRequestHeader.apply(this, arguments);
+  };
 
   XMLHttpRequest.prototype.open = function(method, url, ...rest) {
     this._gemlingMethod = method;
@@ -291,10 +367,22 @@
   XMLHttpRequest.prototype.send = function(body) {
     // ── Response interception: extract conversation data from API responses ──
     if (this._gemlingUrl && this._gemlingUrl.includes('batchexecute')) {
+      const bodyText = typeof body === 'string' ? body : '';
+      const isDelete = bodyText.includes('qWymEb') || bodyText.includes('hXkFw');
+      if (isDelete) {
+        logDeleteReqDetails('Native XHR Delete Request', this._gemlingUrl, bodyText);
+        console.log('[Gemling Probe XHR] Native XHR Delete Headers:', this._gemlingHeaders);
+        if (this._gemlingHeaders) {
+          window.gemlingLastDeleteHeaders = this._gemlingHeaders;
+        }
+      }
       this.addEventListener('load', function() {
         try {
           extractConvDataFromResponse(this.responseText);
         } catch(e) {}
+        if (isDelete) {
+          console.log('[Gemling Probe XHR] Delete Response:', this.responseText);
+        }
       });
     }
 
@@ -373,6 +461,24 @@
               bodyTemplate: bodyText
             }
           }));
+
+          // Also write to DOM as a reliable cross-world backup
+          // (CustomEvent.detail can be unreliable across MAIN/ISOLATED worlds)
+          const rpcMatch = this._gemlingUrl.match(/rpcids=([^&]+)/);
+          const rpcid = rpcMatch ? rpcMatch[1] : '';
+          if (rpcid === 'qWymEb' || rpcid === 'hXkFw') {
+            try {
+              document.documentElement.setAttribute('data-gemling-delete-state', JSON.stringify({
+                url: this._gemlingUrl,
+                sourcePathRaw: sourcePathRaw,
+                bodyTemplate: bodyText,
+                timestamp: Date.now()
+              }));
+              console.log('[Gemling Probe] Delete state written to DOM');
+            } catch (domErr) {
+              console.error('[Gemling Probe] Failed to write delete state to DOM:', domErr);
+            }
+          }
         }
       } catch(e) {
         console.error('[Gemling] parse error:', e);
@@ -463,7 +569,6 @@
   // Keep legacy event name for backward compatibility
   window.addEventListener('gemling-main-fetch-blob', (e) => {
     window.dispatchEvent(new CustomEvent('gemling-main-fetch-image', { detail: e.detail }));
-    // Bridge old response event name
     const handler = (ev) => {
       if (ev.detail.url === e.detail.url) {
         window.removeEventListener('gemling-main-image-ready', handler);
@@ -472,4 +577,149 @@
     };
     window.addEventListener('gemling-main-image-ready', handler);
   });
+
+  // ── Fetch Override ──
+  const originalFetch = window.fetch;
+  window.fetch = async function(resource, config) {
+    let url = '';
+    if (typeof resource === 'string') {
+      url = resource;
+    } else if (resource instanceof Request) {
+      url = resource.url;
+    } else if (resource && resource.toString) {
+      url = resource.toString();
+    }
+    
+    let method = 'GET';
+    if (config && config.method) {
+      method = config.method;
+    } else if (resource instanceof Request) {
+      method = resource.method;
+    }
+
+    if (method.toUpperCase() === 'POST' && url.includes('batchexecute')) {
+      let bodyText = '';
+      if (config && config.body && typeof config.body === 'string') {
+        bodyText = config.body;
+      }
+      
+      const isDelete = bodyText.includes('qWymEb') || bodyText.includes('hXkFw');
+      if (isDelete) {
+        logDeleteReqDetails('Native Fetch Delete Request', url, bodyText);
+      }
+      
+      if (bodyText) {
+        try {
+          let modified = false;
+          const urlMatch = url.match(/source-path=([^&]+)/);
+          const sourcePathRaw = urlMatch ? urlMatch[1] : '';
+
+          if (url.includes('MUAZcd')) {
+            const params = new URLSearchParams(bodyText);
+            const fReq = params.get('f.req');
+            const at = params.get('at');
+
+            if (fReq && at) {
+              const parsed = JSON.parse(fReq);
+              const innerStr = parsed[0][0][1];
+              const inner = JSON.parse(innerStr);
+              const notebookPath = inner[2][7];
+              let convId = inner[2][0];
+
+              if (overrideConvId) {
+                inner[2][0] = overrideConvId;
+                parsed[0][0][1] = JSON.stringify(inner);
+                params.set('f.req', JSON.stringify(parsed));
+                bodyText = params.toString();
+                if (config) config.body = bodyText;
+                convId = overrideConvId;
+                overrideConvId = null;
+                modified = true;
+              }
+
+              window.dispatchEvent(new CustomEvent('gemling-api-captured', {
+                detail: {
+                  url: url,
+                  sourcePathRaw: sourcePathRaw,
+                  at: at,
+                  notebookPath: notebookPath,
+                  convId: convId,
+                  fReqTemplate: innerStr,
+                  bodyTemplate: bodyText
+                }
+              }));
+            }
+          } else {
+            if (overrideDeleteData) {
+              const orig = overrideDeleteData.original;
+              const target = overrideDeleteData.target;
+
+              if (orig && target && typeof orig === 'string' && typeof target === 'string') {
+                const origRaw = orig.startsWith('c_') ? orig.substring(2) : orig;
+                const targetRaw = target.startsWith('c_') ? target.substring(2) : target;
+
+                if (bodyText.includes(orig)) {
+                  bodyText = bodyText.replace(new RegExp(orig.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), target);
+                  modified = true;
+                }
+                if (bodyText.includes(origRaw)) {
+                  bodyText = bodyText.replace(new RegExp(origRaw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), targetRaw);
+                  modified = true;
+                }
+
+                if (modified) {
+                  if (config) config.body = bodyText;
+                  overrideDeleteData = null;
+                }
+              }
+            }
+
+            window.dispatchEvent(new CustomEvent('gemling-api-captured-raw', {
+              detail: {
+                url: url,
+                sourcePathRaw: sourcePathRaw,
+                bodyTemplate: bodyText
+              }
+            }));
+
+            // Also write to DOM as a reliable cross-world backup
+            const rpcMatch = url.match(/rpcids=([^&]+)/);
+            const rpcid = rpcMatch ? rpcMatch[1] : '';
+            if (rpcid === 'qWymEb' || rpcid === 'hXkFw') {
+              try {
+                document.documentElement.setAttribute('data-gemling-delete-state', JSON.stringify({
+                  url: url,
+                  sourcePathRaw: sourcePathRaw,
+                  bodyTemplate: bodyText,
+                  timestamp: Date.now()
+                }));
+                console.log('[Gemling Probe] Delete state written to DOM (fetch)');
+              } catch (domErr) {}
+            }
+          }
+        } catch(e) {
+          console.error('[Gemling] fetch parse error:', e);
+        }
+      }
+    }
+
+    try {
+      const response = await originalFetch.apply(this, arguments);
+      if (url.includes('batchexecute')) {
+        const clone = response.clone();
+        clone.text().then(text => {
+          try {
+            extractConvDataFromResponse(text);
+          } catch(e) {}
+          const bodyText = (config && config.body && typeof config.body === 'string') ? config.body : '';
+          if (bodyText.includes('qWymEb') || bodyText.includes('hXkFw')) {
+            console.log('[Gemling Probe Fetch] Delete Response:', text);
+          }
+        }).catch(e => {});
+      }
+      return response;
+    } catch(err) {
+      throw err;
+    }
+  };
 })();
