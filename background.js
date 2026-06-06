@@ -90,9 +90,15 @@ chrome.runtime.onInstalled.addListener(() => {
   });
 });
 
-// On startup, ensure rules are registered
+// On startup, ensure rules are registered and icon state is restored
 chrome.runtime.onStartup.addListener(() => {
   registerNetRequestRules();
+  chrome.storage.local.get({ isEnabled: true }, (result) => {
+    updateActionIcon(result.isEnabled);
+    chrome.action.setTitle({
+      title: result.isEnabled ? 'Gemling (已启用)' : 'Gemling (已停用)'
+    });
+  });
 });
 
 // Handle extension icon clicks
