@@ -6,6 +6,59 @@
     searchSnippet: 'search-snippet, search-zero-state .conversation-container, project-chat-row'
   };
 
+  const SVG_ICONS = {
+    bookOpen: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="18" height="18" fill="currentColor"><rect width="256" height="256" fill="none"/><path d="M224,48,128,80,32,48V192l96,32,96-32Z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/><line x1="128" y1="80" x2="128" y2="224" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/></svg>`,
+    filePdf: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="18" height="18" fill="currentColor"><rect width="256" height="256" fill="none"/><path d="M160,208h24a32,32,0,0,0,32-32V80a8,8,0,0,0-2.34-5.66L182.34,42.34A8,8,0,0,0,176,40H80A32,32,0,0,0,48,72v24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/><path d="M48,144h64a24,24,0,0,1,24,24v16a24,24,0,0,1-24,24H48Z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/><path d="M128,144v64" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/><path d="M176,144v48" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/><path d="M168,144v48" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/><polyline points="160 40 160 96 216 96" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/></svg>`,
+    trash: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="18" height="18" fill="currentColor"><rect width="256" height="256" fill="none"/><line x1="216" y1="56" x2="40" y2="56" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/><line x1="88" y1="24" x2="168" y2="24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/><path d="M200,56V208a8,8,0,0,1-8,8H64a8,8,0,0,1-8-8V56" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/><line x1="104" y1="104" x2="104" y2="168" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/><line x1="152" y1="104" x2="152" y2="168" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/></svg>`,
+    x: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="16" height="16" fill="currentColor"><rect width="256" height="256" fill="none"/><line x1="200" y1="56" x2="56" y2="200" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/><line x1="200" y1="200" x2="56" y2="56" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/></svg>`,
+    spinner: `<svg class="gemling-animate-spin" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="18" height="18" fill="currentColor"><rect width="256" height="256" fill="none"/><path d="M128,32a96,96,0,1,1-96,96" fill="none" stroke="#2563eb" stroke-linecap="round" stroke-linejoin="round" stroke-width="20"/><path d="M128,32A96,96,0,0,1,224,128" fill="none" stroke="#e5e7eb" stroke-linecap="round" stroke-linejoin="round" stroke-width="20"/></svg>`,
+    checkCircle: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="22" height="22" fill="currentColor"><rect width="256" height="256" fill="none"/><circle cx="128" cy="128" r="96" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/><polyline points="172 104 113.3 162.7 84 133.3" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/></svg>`
+  };
+
+  function showDefaultView() {
+    const defaultView = actionBar?.querySelector('#gemlingDefaultView');
+    const progressView = actionBar?.querySelector('#gemlingProgressView');
+    const resultView = actionBar?.querySelector('#gemlingResultView');
+    
+    defaultView?.classList.remove('gemling-hidden');
+    progressView?.classList.add('gemling-hidden');
+    resultView?.classList.add('gemling-hidden');
+  }
+
+  function showProgressView(text, percent) {
+    const defaultView = actionBar?.querySelector('#gemlingDefaultView');
+    const progressView = actionBar?.querySelector('#gemlingProgressView');
+    const resultView = actionBar?.querySelector('#gemlingResultView');
+    
+    defaultView?.classList.add('gemling-hidden');
+    progressView?.classList.remove('gemling-hidden');
+    resultView?.classList.add('gemling-hidden');
+
+    const progressText = actionBar?.querySelector('#gemlingProgressText');
+    const progressBar = actionBar?.querySelector('#gemlingProgressBar');
+
+    if (progressText) progressText.textContent = text;
+    if (progressBar) progressBar.style.width = `${percent}%`;
+  }
+
+  function showResultView(text) {
+    const defaultView = actionBar?.querySelector('#gemlingDefaultView');
+    const progressView = actionBar?.querySelector('#gemlingProgressView');
+    const resultView = actionBar?.querySelector('#gemlingResultView');
+    
+    defaultView?.classList.add('gemling-hidden');
+    progressView?.classList.add('gemling-hidden');
+    resultView?.classList.remove('gemling-hidden');
+
+    const resultText = actionBar?.querySelector('#gemlingResultText');
+    if (resultText) resultText.textContent = text;
+  }
+
+  function handleFinishAction() {
+    showDefaultView();
+    handleCancelBulk();
+  }
+
   let checkedConversationIds = new Set(); // 用 conversationId 存储选中状态
   let actionBar = null;
   let apiState = null; // { at, notebookPath, bodyTemplate }
@@ -139,17 +192,62 @@
     const exportText = chrome.i18n.getMessage("actionExport");
 
     actionBar.innerHTML = `
-      <span class="gemling-count">${selectedText}</span>
-      <span class="gemling-status"></span>
-      <button class="gemling-btn gemling-btn-cancel" disabled>${cancelText}</button>
-      <button class="gemling-btn gemling-btn-delete" disabled>${deleteText}</button>
-      <button class="gemling-btn gemling-btn-export" disabled>${exportText}</button>
-      <button class="gemling-btn" disabled>${addText}</button>
+      <span class="gemling-status" style="display: none;"></span>
+      <!-- ====== View 1: Default Action View ====== -->
+      <div id="gemlingDefaultView" class="gemling-view gemling-default-view">
+          <div class="gemling-count-section">
+              <div class="gemling-badge" id="gemlingSelectedCountBadge">0</div>
+              <span class="gemling-count-text">${selectedText}</span>
+          </div>
+          <div class="gemling-buttons-section">
+              <button class="gemling-action-btn gemling-btn-add" title="${addText}" disabled>
+                  ${SVG_ICONS.bookOpen}
+                  <span class="gemling-btn-label">${addText}</span>
+              </button>
+              <button class="gemling-action-btn gemling-btn-export" title="${exportText}" disabled>
+                  ${SVG_ICONS.filePdf}
+                  <span class="gemling-btn-label">${exportText}</span>
+              </button>
+              <div class="gemling-divider"></div>
+              <button class="gemling-action-btn gemling-btn-delete" title="${deleteText}" disabled>
+                  ${SVG_ICONS.trash}
+                  <span class="gemling-btn-label">${deleteText}</span>
+              </button>
+          </div>
+          <div class="gemling-divider"></div>
+          <button class="gemling-close-btn gemling-btn-cancel" title="${cancelText}">
+              ${SVG_ICONS.x}
+          </button>
+      </div>
+
+      <!-- ====== View 2: Progress View ====== -->
+      <div id="gemlingProgressView" class="gemling-view gemling-progress-view gemling-hidden">
+          <div class="gemling-progress-header">
+              <span id="gemlingProgressText" class="gemling-progress-text">正在处理...</span>
+              <div class="gemling-spinner">
+                  ${SVG_ICONS.spinner}
+              </div>
+          </div>
+          <div class="gemling-progress-bar-bg">
+              <div id="gemlingProgressBar" class="gemling-progress-bar-fill" style="width: 0%"></div>
+          </div>
+      </div>
+
+      <!-- ====== View 3: Result View ====== -->
+      <div id="gemlingResultView" class="gemling-view gemling-result-view gemling-hidden">
+          <div class="gemling-result-info">
+              ${SVG_ICONS.checkCircle}
+              <span id="gemlingResultText" class="gemling-result-text">处理完成</span>
+          </div>
+          <button class="gemling-finish-btn" id="gemlingFinishBtn">
+              完成
+          </button>
+      </div>
     `;
 
     document.body.appendChild(actionBar);
 
-    const btn = actionBar.querySelector('.gemling-btn:not(.gemling-btn-delete):not(.gemling-btn-cancel):not(.gemling-btn-export)');
+    const btn = actionBar.querySelector('.gemling-btn-add');
     if (btn) {
       btn.addEventListener('click', handleBulkAddToNotebook);
     }
@@ -168,62 +266,76 @@
     if (btnExport) {
       btnExport.addEventListener('click', handleBulkExport);
     }
+
+    const btnFinish = actionBar.querySelector('#gemlingFinishBtn');
+    if (btnFinish) {
+      btnFinish.addEventListener('click', handleFinishAction);
+    }
   }
 
   function updateCount() {
     const count = checkedConversationIds.size;
     injectActionBar();
-    const countEl = actionBar.querySelector('.gemling-count');
-
+    
+    const countBadge = actionBar.querySelector('#gemlingSelectedCountBadge');
+    if (countBadge) {
+      countBadge.textContent = count.toString();
+    }
+    const countEl = actionBar.querySelector('.gemling-count-text');
     if (countEl) {
       countEl.textContent = chrome.i18n.getMessage("countSelected", [count.toString()]);
     }
 
-    const btn = actionBar.querySelector('.gemling-btn:not(.gemling-btn-delete):not(.gemling-btn-cancel):not(.gemling-btn-export)');
-    const btnDelete = actionBar.querySelector(".gemling-btn-delete");
-    const btnExport = actionBar.querySelector(".gemling-btn-export");
-    if (count > 0 || btn?.dataset?.state === 'finished' || btnDelete?.dataset?.state === 'finished' || btnExport?.dataset?.state === 'finished') {
-      actionBar.classList.remove('gemling-action-bar-hidden');
+    if (count > 0) {
+      showActionBar();
     } else {
-      actionBar.classList.add('gemling-action-bar-hidden');
+      hideActionBar();
     }
 
     updateButtonState();
   }
 
-  function updateButtonState() {
-    const btn = actionBar.querySelector('.gemling-btn:not(.gemling-btn-delete):not(.gemling-btn-cancel):not(.gemling-btn-export)');
-    const btnDelete = actionBar.querySelector('.gemling-btn-delete');
-    const btnCancel = actionBar.querySelector('.gemling-btn-cancel');
-    const btnExport = actionBar.querySelector('.gemling-btn-export');
-    const statusEl = actionBar.querySelector('.gemling-status');
+  function showActionBar() {
+    if (!actionBar) return;
+    if (actionBar.classList.contains('gemling-action-bar-enter')) return;
+    
+    actionBar.classList.remove('gemling-action-bar-hidden');
+    actionBar.classList.remove('gemling-action-bar-exit');
+    actionBar.classList.add('gemling-action-bar-enter');
+  }
 
-    // 清空状态提示，不再显示警告
-    if (statusEl) {
-      statusEl.textContent = '';
-      statusEl.className = 'gemling-status';
-    }
+  function hideActionBar() {
+    if (!actionBar) return;
+    if (actionBar.classList.contains('gemling-action-bar-hidden')) return;
+    if (actionBar.classList.contains('gemling-action-bar-exit')) return;
+
+    actionBar.classList.remove('gemling-action-bar-enter');
+    actionBar.classList.add('gemling-action-bar-exit');
+    setTimeout(() => {
+      if (checkedConversationIds.size === 0) {
+        actionBar.classList.add('gemling-action-bar-hidden');
+      }
+    }, 300);
+  }
+
+  function updateButtonState() {
+    const btn = actionBar.querySelector('.gemling-btn-add');
+    const btnDelete = actionBar.querySelector('.gemling-btn-delete');
+    const btnExport = actionBar.querySelector('.gemling-btn-export');
 
     const hasSelection = checkedConversationIds.size > 0;
 
-    if (btn?.dataset?.state === 'finished') {
-      btn.disabled = false;
-    } else if (btn) {
+    if (btn) {
       btn.disabled = !hasSelection;
     }
-
-    if (btnDelete?.dataset?.state === 'finished') {
-      btnDelete.disabled = false;
-    } else if (btnDelete) {
+    if (btnDelete) {
       btnDelete.disabled = !hasSelection;
     }
-
-    if (btnExport?.dataset?.state === 'finished') {
-      btnExport.disabled = false;
-    } else if (btnExport) {
+    if (btnExport) {
       btnExport.disabled = !hasSelection;
     }
 
+    const btnCancel = actionBar.querySelector('.gemling-btn-cancel');
     if (btnCancel) {
       btnCancel.disabled = !hasSelection;
     }
@@ -319,23 +431,7 @@
         checkedConversationIds.delete(convId);
       }
 
-      const btn = actionBar?.querySelector('.gemling-btn:not(.gemling-btn-delete):not(.gemling-btn-cancel):not(.gemling-btn-export)');
-      if (btn && btn.dataset.state === 'finished') {
-        btn.dataset.state = '';
-        btn.textContent = chrome.i18n.getMessage("actionAdd");
-      }
-
-      const btnDelete = actionBar?.querySelector('.gemling-btn-delete');
-      if (btnDelete && btnDelete.dataset.state === 'finished') {
-        btnDelete.dataset.state = '';
-        btnDelete.textContent = chrome.i18n.getMessage("actionDelete");
-      }
-
-      const btnExport = actionBar?.querySelector('.gemling-btn-export');
-      if (btnExport && btnExport.dataset.state === 'finished') {
-        btnExport.dataset.state = '';
-        btnExport.textContent = chrome.i18n.getMessage("actionExport");
-      }
+      // Removed button state resetting as it's now handled by the dedicated finish action view
 
       updateCount();
     });
@@ -390,44 +486,22 @@
       cb.dataset.checked = 'false';
     });
 
-    // reset button states
-    const btn = actionBar?.querySelector('.gemling-btn:not(.gemling-btn-delete):not(.gemling-btn-cancel):not(.gemling-btn-export)');
-    if (btn) {
-      btn.dataset.state = '';
-      btn.textContent = chrome.i18n.getMessage("actionAdd");
-    }
+    // Reset button datasets
+    const btn = actionBar?.querySelector('.gemling-btn-add');
+    if (btn) btn.dataset.state = '';
 
     const btnDelete = actionBar?.querySelector('.gemling-btn-delete');
-    if (btnDelete) {
-      btnDelete.dataset.state = '';
-      btnDelete.textContent = chrome.i18n.getMessage("actionDelete");
-    }
+    if (btnDelete) btnDelete.dataset.state = '';
 
     const btnExport = actionBar?.querySelector('.gemling-btn-export');
-    if (btnExport) {
-      btnExport.dataset.state = '';
-      btnExport.textContent = chrome.i18n.getMessage("actionExport");
-    }
+    if (btnExport) btnExport.dataset.state = '';
 
     updateCount();
   }
 
   async function handleBulkAddToNotebook() {
-    const btn = actionBar.querySelector('.gemling-btn:not(.gemling-btn-delete):not(.gemling-btn-cancel)');
+    const btn = actionBar.querySelector('.gemling-btn-add');
     if (!btn) return;
-
-    const actionAddText = chrome.i18n.getMessage("actionAdd");
-
-    if (btn.dataset.state === 'finished') {
-      btn.dataset.state = '';
-      btn.textContent = actionAddText;
-      checkedConversationIds.clear();
-      document.querySelectorAll('.gemling-checkbox').forEach(cb => cb.dataset.checked = 'false');
-      updateCount();
-      return;
-    }
-
-    btn.disabled = true;
 
     // 清除旧的 API 状态，确保等待新的笔记本选择
     apiState = null;
@@ -435,25 +509,24 @@
     // 获取第一个选中的对话项
     const firstConvId = checkedConversationIds.values().next().value;
     if (!firstConvId) {
-      btn.disabled = false;
       return;
     }
 
     const firstItem = findConversationItem(firstConvId);
     if (!firstItem) {
       console.error('[Gemling] 未找到对话项:', firstConvId);
-      btn.disabled = false;
       return;
     }
 
-    btn.textContent = chrome.i18n.getMessage("actionSelect");
+    // 1. 显示选择视图
+    showProgressView(chrome.i18n.getMessage("actionSelect"), 0);
     triggerNativeAddToNotebook(firstItem);
 
     // 等待 API 捕获（最多等待 30 秒）
     const captured = await waitForApiCapture(30000);
     if (!captured) {
-      btn.textContent = actionAddText;
-      btn.disabled = false;
+      showDefaultView();
+      updateCount();
       return;
     }
 
@@ -472,9 +545,12 @@
     for (let i = 0; i < convIds.length; i++) {
       const convId = convIds[i];
       // 进度显示考虑上第一个已成功的
-      const current = (i + 2).toString();
-      const total = (convIds.length + 1).toString();
-      btn.textContent = chrome.i18n.getMessage("actionProcessing", [current, total]);
+      const current = i + 2;
+      const total = convIds.length + 1;
+      const percent = (current / total) * 100;
+      const progressMsg = chrome.i18n.getMessage("actionProcessing", [current.toString(), total.toString()]);
+      
+      showProgressView(progressMsg, percent);
 
       try {
         await addToNotebookViaApi(convId);
@@ -495,10 +571,8 @@
     }
 
     const failMsg = failCount > 0 ? chrome.i18n.getMessage("actionFailMsg", [failCount.toString()]) : '';
-    btn.textContent = chrome.i18n.getMessage("actionDone", [successCount.toString(), failMsg]);
-    btn.dataset.state = 'finished';
-    btn.disabled = false;
-    updateCount();
+    const doneText = chrome.i18n.getMessage("actionDone", [successCount.toString(), failMsg]);
+    showResultView(doneText);
   }
 
 
@@ -506,19 +580,10 @@
     const btnDelete = actionBar.querySelector('.gemling-btn-delete');
     if (!btnDelete) return;
 
-    const actionDeleteText = chrome.i18n.getMessage("actionDelete");
-
-    if (btnDelete.dataset.state === 'finished') {
-      handleCancelBulk();
-      return;
-    }
-
-    btnDelete.disabled = true;
     isBulkDeleteActive = true;
 
     const convIds = Array.from(checkedConversationIds);
     if (convIds.length === 0) {
-      btnDelete.disabled = false;
       return;
     }
 
@@ -526,17 +591,17 @@
     const firstItem = findConversationItem(firstConvId);
     if (!firstItem) {
       console.error('[Gemling] 未找到对话项:', firstConvId);
-      btnDelete.disabled = false;
       return;
     }
 
     // ── Step 1: First conversation - user manually confirms (safety check) ──
-    btnDelete.textContent = "...";
+    showProgressView("等待手动确认删除...", 0);
     triggerNativeDelete(firstItem);
 
     const userConfirmed = await waitForDialogUserConfirm();
     if (!userConfirmed) {
       // User cancelled the dialog
+      showDefaultView();
       handleCancelBulk();
       return;
     }
@@ -552,9 +617,12 @@
     // ── Step 2: Remaining conversations - native UI with auto-confirm ──
     for (let i = 1; i < convIds.length; i++) {
       const convId = convIds[i];
-      const current = (i + 1).toString();
-      const total = convIds.length.toString();
-      btnDelete.textContent = chrome.i18n.getMessage("actionProcessing", [current, total]);
+      const current = i + 1;
+      const total = convIds.length;
+      const percent = (current / total) * 100;
+      const progressMsg = chrome.i18n.getMessage("actionProcessing", [current.toString(), total.toString()]);
+      
+      showProgressView(progressMsg, percent);
 
       const item = findConversationItem(convId);
       if (!item) {
@@ -592,11 +660,9 @@
     }
 
     const failMsg = failCount > 0 ? chrome.i18n.getMessage("actionFailMsg", [failCount.toString()]) : '';
-    btnDelete.textContent = chrome.i18n.getMessage("actionDone", [successCount.toString(), failMsg]);
-    btnDelete.dataset.state = 'finished';
-    btnDelete.disabled = false;
+    const doneText = chrome.i18n.getMessage("actionDone", [successCount.toString(), failMsg]);
+    showResultView(doneText);
     isBulkDeleteActive = false;
-    updateCount();
   }
 
   function triggerNativeDelete(item) {
@@ -1852,13 +1918,6 @@ ${conversationsHtml}
     const btnExport = actionBar.querySelector('.gemling-btn-export');
     if (!btnExport) return;
 
-    if (btnExport.dataset.state === 'finished') {
-      handleCancelBulk();
-      return;
-    }
-
-    btnExport.disabled = true;
-
     const convIds = Array.from(checkedConversationIds);
     let successCount = 0;
     let failCount = 0;
@@ -1870,9 +1929,12 @@ ${conversationsHtml}
 
     for (let i = 0; i < convIds.length; i++) {
       const convId = convIds[i];
-      const current = (i + 1).toString();
-      const total = convIds.length.toString();
-      btnExport.textContent = chrome.i18n.getMessage("actionProcessing", [current, total]);
+      const current = i + 1;
+      const total = convIds.length;
+      const percent = (current / total) * 100;
+      const progressMsg = chrome.i18n.getMessage("actionProcessing", [current.toString(), total.toString()]);
+      
+      showProgressView(progressMsg, percent);
 
       try {
         const { markdown, images: fetchedImages, title: fetchedTitle } = await getConversationContent(convId);
@@ -1936,10 +1998,8 @@ ${conversationsHtml}
     }
 
     const failMsg = failCount > 0 ? chrome.i18n.getMessage("actionFailMsg", [failCount.toString()]) : '';
-    btnExport.textContent = chrome.i18n.getMessage("actionDone", [successCount.toString(), failMsg]);
-    btnExport.dataset.state = 'finished';
-    btnExport.disabled = false;
-    updateCount();
+    const doneText = chrome.i18n.getMessage("actionDone", [successCount.toString(), failMsg]);
+    showResultView(doneText);
   }
 
   function runExportTabLogic() {

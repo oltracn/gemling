@@ -1,3 +1,6 @@
+/* styles.css */
+
+/* ====== Checkbox Styling (Preserved) ====== */
 .gemling-checkbox {
   width: 18px !important;
   height: 18px !important;
@@ -6,8 +9,8 @@
   margin-right: 12px !important;
   cursor: pointer !important;
   flex-shrink: 0 !important;
-  border: 1px solid #9ca3af !important;
-  border-radius: 4px !important;
+  border: 1px solid #d1d5db !important; /* border-gray-300 */
+  border-radius: 6px !important;
   background: #ffffff !important;
   position: relative !important;
   box-sizing: border-box !important;
@@ -16,42 +19,80 @@
   align-self: center !important;
   margin-top: auto !important;
   margin-bottom: auto !important;
+  transition: all 0.2s ease-in-out !important;
 }
 
 .gemling-checkbox[data-checked="true"] {
-  background: #ffffff !important;
-  border-color: #9ca3af !important;
+  background-color: #2563eb !important; /* bg-blue-600 */
+  border-color: #2563eb !important;
 }
 
 .gemling-checkbox[data-checked="true"]::after {
   content: '' !important;
   display: block !important;
   position: absolute !important;
-  left: 4px !important;
-  top: 1px !important;
+  left: 5px !important;
+  top: 2px !important;
   width: 5px !important;
-  height: 10px !important;
-  border: solid #4b5563 !important;
+  height: 9px !important;
+  border: solid #ffffff !important;
   border-width: 0 2px 2px 0 !important;
   transform: rotate(45deg) !important;
 }
 
+/* ====== Floating Action Bar (New Styled Pop-up) ====== */
 .gemling-action-bar {
   position: fixed;
-  bottom: 20px;
+  bottom: 24px;
   left: 50%;
-  transform: translateX(-50%);
-  background: #fafafa;
-  border: 1px solid #e4e4e7;
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-  padding: 12px 20px;
+  transform: translate(-50%, 120%);
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.02);
+  border: 1px solid #f3f4f6; /* border-gray-100 */
+  padding: 8px; /* p-2 */
   display: flex;
   align-items: center;
-  gap: 16px;
   z-index: 999999;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  transition: opacity 0.2s, visibility 0.2s;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  width: min(calc(100% - 32px), 500px);
+  min-height: 56px;
+  box-sizing: border-box;
+  overflow: hidden;
+  visibility: hidden;
+  opacity: 0;
+}
+
+/* Enter and exit animations */
+@keyframes gemlingSlideUp {
+  from {
+    transform: translate(-50%, 120%);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
+}
+
+@keyframes gemlingSlideDown {
+  from {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
+  to {
+    transform: translate(-50%, 150%);
+    opacity: 0;
+  }
+}
+
+.gemling-action-bar-enter {
+  visibility: visible;
+  animation: gemlingSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.gemling-action-bar-exit {
+  animation: gemlingSlideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .gemling-action-bar-hidden {
@@ -60,72 +101,227 @@
   pointer-events: none;
 }
 
-.gemling-count {
-  color: #27272a;
-  font-size: 14px;
-  font-weight: 500;
+/* ====== Views Inside Floating Action Bar ====== */
+.gemling-view {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  box-sizing: border-box;
+  transition: opacity 0.3s ease;
 }
 
-.gemling-btn {
-  background: #18181b;
-  color: #fafafa;
+.gemling-hidden {
+  display: none !important;
+}
+
+/* ====== View 1: Default Action View ====== */
+.gemling-default-view {
+  gap: 8px;
+}
+
+.gemling-count-section {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  border-right: 1px solid #f3f4f6; /* border-gray-100 */
+  white-space: nowrap;
+}
+
+.gemling-badge {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background-color: #dbeafe; /* bg-blue-100 */
+  color: #2563eb; /* text-blue-600 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.gemling-count-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: #4b5563; /* text-gray-600 */
+}
+
+.gemling-buttons-section {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  justify-content: center;
+}
+
+.gemling-action-btn {
+  background: transparent;
   border: none;
-  border-radius: 8px;
-  padding: 8px 16px;
-  font-size: 14px;
-  font-weight: 500;
+  border-radius: 12px; /* rounded-xl */
+  padding: 6px 10px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  color: #4b5563; /* text-gray-600 */
   cursor: pointer;
-  transition: background 0.2s;
+  transition: background-color 0.2s, color 0.2s;
 }
 
-.gemling-btn:hover {
-  background: #3f3f46;
+.gemling-action-btn:hover:not(:disabled) {
+  background-color: #f9fafb; /* hover:bg-gray-50 */
+  color: #111827; /* hover:text-gray-900 */
 }
 
-.gemling-btn:disabled {
-  background: #a1a1aa;
+.gemling-action-btn:disabled {
+  opacity: 0.35;
   cursor: not-allowed;
 }
 
-.gemling-status {
-  font-size: 12px;
-  color: #71717a;
+.gemling-action-btn svg {
+  transition: transform 0.2s;
+  color: currentColor;
+  flex-shrink: 0;
 }
 
-.gemling-status-warn {
-  color: #d97706;
-  font-style: italic;
+.gemling-action-btn:hover:not(:disabled) svg {
+  transform: scale(1.1);
+}
+
+.gemling-btn-label {
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .gemling-btn-delete {
-  background: #ef4444;
-  color: #ffffff;
+  color: #ef4444; /* text-red-500 */
 }
 
-.gemling-btn-delete:hover {
-  background: #dc2626;
+.gemling-btn-delete:hover:not(:disabled) {
+  background-color: #fef2f2; /* hover:bg-red-50 */
+  color: #dc2626; /* hover:text-red-600 */
 }
 
-.gemling-btn-delete:disabled {
-  background: #fca5a5;
-  cursor: not-allowed;
+.gemling-divider {
+  width: 1px;
+  height: 20px;
+  background-color: #e5e7eb; /* bg-gray-200 */
+  margin: 0 2px;
 }
 
-.gemling-btn-cancel {
-  background: #e4e4e7;
-  color: #27272a;
-  border: 1px solid #d4d4d8;
+.gemling-close-btn {
+  padding: 8px;
+  border-radius: 12px; /* rounded-xl */
+  background: transparent;
+  border: none;
+  color: #9ca3af; /* text-gray-400 */
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.gemling-btn-cancel:hover {
-  background: #d4d4d8;
+.gemling-close-btn:hover {
+  background-color: #f3f4f6; /* hover:bg-gray-100 */
+  color: #374151; /* hover:text-gray-700 */
 }
 
-.gemling-btn-cancel:disabled {
-  color: #a1a1aa;
-  cursor: not-allowed;
+/* ====== View 2: Progress View ====== */
+.gemling-progress-view {
+  flex-direction: column;
+  justify-content: center;
+  padding: 4px 16px;
+  height: 40px;
 }
 
+.gemling-progress-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-bottom: 6px;
+}
+
+.gemling-progress-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151; /* text-gray-700 */
+}
+
+.gemling-spinner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.gemling-animate-spin {
+  animation: gemlingSpin 1s linear infinite;
+}
+
+@keyframes gemlingSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.gemling-progress-bar-bg {
+  width: 100%;
+  background-color: #f3f4f6; /* bg-gray-100 */
+  border-radius: 9999px;
+  height: 5px;
+  overflow: hidden;
+}
+
+.gemling-progress-bar-fill {
+  background-color: #2563eb; /* bg-blue-600 */
+  height: 100%;
+  border-radius: 9999px;
+  transition: width 0.3s ease;
+  width: 0%;
+}
+
+/* ====== View 3: Result View ====== */
+.gemling-result-view {
+  justify-content: space-between;
+  padding: 4px 16px;
+  height: 40px;
+}
+
+.gemling-result-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #059669; /* text-green-600 */
+}
+
+.gemling-result-text {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.gemling-finish-btn {
+  padding: 6px 14px;
+  background-color: #ecfdf5; /* bg-green-50 */
+  color: #047857; /* text-green-700 */
+  border: none;
+  border-radius: 10px; /* rounded-xl */
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.gemling-finish-btn:hover {
+  background-color: #d1fae5; /* hover:bg-green-100 */
+}
+
+/* ====== DOM Integration (Preserved) ====== */
 search-snippet {
   display: flex !important;
   align-items: center !important;
@@ -176,18 +372,3 @@ project-chat-row .gemling-checkbox {
   margin-right: 8px !important;
   top: 1px !important;
 }
-
-.gemling-btn-export {
-  background: #2563eb;
-  color: #ffffff;
-}
-
-.gemling-btn-export:hover {
-  background: #1d4ed8;
-}
-
-.gemling-btn-export:disabled {
-  background: #93c5fd;
-  cursor: not-allowed;
-}
-
