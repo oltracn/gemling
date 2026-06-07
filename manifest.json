@@ -36,7 +36,6 @@
         "https://gemini.google.com/*"
       ],
       "js": [
-        "assets/lib/html2pdf.bundle.min.js",
         "content.js"
       ],
       "css": [

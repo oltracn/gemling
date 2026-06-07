@@ -6,7 +6,7 @@
     "message": "批量管理 Google Gemini 对话，支持一键将多个对话移动到笔记本。"
   },
   "actionAdd": {
-    "message": "添加"
+    "message": "移动"
   },
   "actionSelect": {
     "message": "请选择笔记本..."
@@ -57,5 +57,14 @@
   },
   "actionExport": {
     "message": "导出"
+  },
+  "tooltipAdd": {
+    "message": "移动至指定的笔记本"
+  },
+  "tooltipExport": {
+    "message": "打包导出HTML文件"
+  },
+  "tooltipDelete": {
+    "message": "删除后无法恢复，请谨慎操作"
   }
 }

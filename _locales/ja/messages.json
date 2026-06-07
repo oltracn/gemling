@@ -6,7 +6,7 @@
     "message": "Google Gemini の会話を一括管理し、ワンクリックで複数のチャットをノートブックに移動できます。"
   },
   "actionAdd": {
-    "message": "ノートブックに追加"
+    "message": "移動"
   },
   "actionSelect": {
     "message": "ノートブックを選択してください..."
@@ -56,6 +56,15 @@
     "message": "Cancel"
   },
   "actionExport": {
-    "message": "PDF エクスポート"
+    "message": "HTML エクスポート"
+  },
+  "tooltipAdd": {
+    "message": "指定したノートブックに移動する"
+  },
+  "tooltipExport": {
+    "message": "HTMLファイルとしてエクスポートする"
+  },
+  "tooltipDelete": {
+    "message": "削除後は元に戻せません。慎重に操作してください。"
   }
 }

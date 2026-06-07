@@ -6,7 +6,7 @@
     "message": "Batch manage Google Gemini conversations, including moving multiple chats to a notebook with one click."
   },
   "actionAdd": {
-    "message": "Add"
+    "message": "Move"
   },
   "actionSelect": {
     "message": "Please select notebook..."
@@ -57,5 +57,14 @@
   },
   "actionExport": {
     "message": "Export"
+  },
+  "tooltipAdd": {
+    "message": "Move to a specific notebook"
+  },
+  "tooltipExport": {
+    "message": "Export as a HTML file"
+  },
+  "tooltipDelete": {
+    "message": "Cannot be recovered after deletion. Please proceed with caution."
   }
 }

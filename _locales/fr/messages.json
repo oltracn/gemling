@@ -6,7 +6,7 @@
     "message": "Gérez en masse les conversations Google Gemini, y compris le déplacement de plusieurs discussions vers un carnet en un clic."
   },
   "actionAdd": {
-    "message": "Ajouter au carnet"
+    "message": "Déplacer"
   },
   "actionSelect": {
     "message": "Veuillez sélectionner le carnet..."
@@ -56,6 +56,15 @@
     "message": "Cancel"
   },
   "actionExport": {
-    "message": "Exporter PDF"
+    "message": "Exporter HTML"
+  },
+  "tooltipAdd": {
+    "message": "Déplacer vers un carnet spécifique"
+  },
+  "tooltipExport": {
+    "message": "Exporter en tant que fichier HTML"
+  },
+  "tooltipDelete": {
+    "message": "Impossible de récupérer après suppression. Veuillez procéder avec prudence."
   }
 }

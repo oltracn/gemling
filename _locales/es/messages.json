@@ -6,7 +6,7 @@
     "message": "Administre por lotes las conversaciones de Google Gemini, como mover varios chats a un cuaderno con un solo clic."
   },
   "actionAdd": {
-    "message": "Añadir a cuaderno"
+    "message": "Mover"
   },
   "actionSelect": {
     "message": "Seleccione el cuaderno..."
@@ -56,6 +56,15 @@
     "message": "Cancel"
   },
   "actionExport": {
-    "message": "Exportar PDF"
+    "message": "Exportar HTML"
+  },
+  "tooltipAdd": {
+    "message": "Mover a un cuaderno específico"
+  },
+  "tooltipExport": {
+    "message": "Exportar como archivo HTML"
+  },
+  "tooltipDelete": {
+    "message": "No se puede recuperar después de la eliminación. Por favor proceda con precaución."
   }
 }

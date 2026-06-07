@@ -6,7 +6,7 @@
     "message": "Verwalten Sie Google Gemini-Konversationen im Stapel, z. B. durch das Verschieben mehrerer Chats in ein Notizbuch mit einem Klick."
   },
   "actionAdd": {
-    "message": "Zum Notizbuch hinzufügen"
+    "message": "Verschieben"
   },
   "actionSelect": {
     "message": "Bitte Notizbuch auswählen..."
@@ -56,6 +56,15 @@
     "message": "Cancel"
   },
   "actionExport": {
-    "message": "PDF exportieren"
+    "message": "HTML exportieren"
+  },
+  "tooltipAdd": {
+    "message": "In ein bestimmtes Notizbuch verschieben"
+  },
+  "tooltipExport": {
+    "message": "Als HTML-Datei exportieren"
+  },
+  "tooltipDelete": {
+    "message": "Kann nach dem Löschen nicht wiederhergestellt werden. Bitte mit Vorsicht fortfahren."
   }
 }

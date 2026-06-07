@@ -191,6 +191,10 @@
     const cancelText = chrome.i18n.getMessage("actionCancel");
     const exportText = chrome.i18n.getMessage("actionExport");
 
+    const tooltipAdd = chrome.i18n.getMessage("tooltipAdd") || addText;
+    const tooltipExport = chrome.i18n.getMessage("tooltipExport") || exportText;
+    const tooltipDelete = chrome.i18n.getMessage("tooltipDelete") || deleteText;
+
     actionBar.innerHTML = `
       <span class="gemling-status" style="display: none;"></span>
       <!-- ====== View 1: Default Action View ====== -->
@@ -200,16 +204,16 @@
               <span class="gemling-count-text">${selectedText}</span>
           </div>
           <div class="gemling-buttons-section">
-              <button class="gemling-action-btn gemling-btn-add" title="${addText}" disabled>
+              <button class="gemling-action-btn gemling-btn-add" title="${tooltipAdd}" disabled>
                   ${SVG_ICONS.bookOpen}
                   <span class="gemling-btn-label">${addText}</span>
               </button>
-              <button class="gemling-action-btn gemling-btn-export" title="${exportText}" disabled>
+              <button class="gemling-action-btn gemling-btn-export" title="${tooltipExport}" disabled>
                   ${SVG_ICONS.filePdf}
                   <span class="gemling-btn-label">${exportText}</span>
               </button>
               <div class="gemling-divider"></div>
-              <button class="gemling-action-btn gemling-btn-delete" title="${deleteText}" disabled>
+              <button class="gemling-action-btn gemling-btn-delete" title="${tooltipDelete}" disabled>
                   ${SVG_ICONS.trash}
                   <span class="gemling-btn-label">${deleteText}</span>
               </button>
@@ -1524,7 +1528,11 @@
     elements.forEach(el => {
       const tagName = el.tagName.toLowerCase();
       if (tagName === 'user-query-content') {
-        const promptText = el.textContent.trim();
+        const clone = el.cloneNode(true);
+        // Remove hidden screen reader texts like "You said:"
+        clone.querySelectorAll('.hidden, .visually-hidden, .hidden-text, .sr-only, [style*="display: none"]').forEach(n => n.remove());
+        const promptText = clone.textContent.trim();
+        
         markdown += `### User\n\n${promptText}\n\n`;
 
         if (exportContext) {
@@ -1586,10 +1594,41 @@
     return convId;
   }
 
+  async function scrollAndSettleDOM() {
+    return new Promise(resolve => {
+      let lastCount = -1;
+      let stableCount = 0;
+      
+      // Attempt to scroll main containers as well
+      const containers = [document.body, document.documentElement, document.querySelector('.conversation-container')].filter(Boolean);
+      
+      const checkInterval = setInterval(() => {
+        containers.forEach(c => {
+          try { c.scrollTop = c.scrollHeight; } catch (e) {}
+        });
+        window.scrollTo(0, document.body.scrollHeight);
+        
+        const currentCount = document.querySelectorAll('user-query-content, message-content, img').length;
+        if (currentCount === lastCount) {
+          stableCount++;
+          if (stableCount >= 3) {
+            clearInterval(checkInterval);
+            resolve();
+          }
+        } else {
+          lastCount = currentCount;
+          stableCount = 0;
+        }
+      }, 500);
+    });
+  }
+
   async function getConversationContent(convId) {
     const cleanId = convId.startsWith('c_') ? convId.substring(2) : convId;
 
     if (window.location.pathname.includes(cleanId)) {
+      await scrollAndSettleDOM();
+      
       const exportContext = { convId: cleanId, images: [] };
       const markdown = extractMessages(document, exportContext);
       
@@ -1830,39 +1869,72 @@
 <html lang="zh">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${escapeHtml(conv.title)}</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', 'PingFang SC', sans-serif;
-  font-size: 12pt;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 15px;
   line-height: 1.6;
-  color: #000;
-  background: #fff;
+  color: #333;
+  background: #f4f5f7;
+  padding: 40px 20px;
 }
-.content { max-width: 800px; margin: 0 auto; padding: 20px; }
-.conversation { background: #fff; }
-.conv-header { margin-bottom: 30px; }
-.conv-title { font-size: 18pt; font-weight: bold; margin-bottom: 5px; }
-.conv-date { font-size: 10pt; color: #666; }
-.message { margin: 20px 0; }
-.role-label { font-size: 11pt; font-weight: bold; margin-bottom: 5px; text-decoration: underline; }
-.message-user .role-label { color: #333; }
-.message-gemini .role-label { color: #000; }
-.message-content p { margin: 10px 0; }
-h2, h3, h4 { margin: 20px 0 10px; }
-h2 { font-size: 16pt; } h3 { font-size: 14pt; }
-pre { margin: 15px 0; font-family: monospace; font-size: 10pt; white-space: pre-wrap; word-wrap: break-word; }
-code { font-family: monospace; font-size: 10pt; }
-blockquote { border-left: 3px solid #ccc; padding-left: 10px; margin: 15px 0; color: #444; }
-table { border-collapse: collapse; width: 100%; margin: 15px 0; }
-th, td { border: 1px solid #000; padding: 5px 10px; text-align: left; }
-ul, ol { padding-left: 25px; margin: 10px 0; }
-a { color: #000; text-decoration: underline; }
-.truncated { color: #666; }
-.image-container { margin: 10px 0; text-align: center; }
-.image-container img { max-width: 100%; height: auto; }
-.user-images { margin: 8px 0; }
-.user-images img { max-width: 300px; height: auto; border-radius: 4px; }
+.content { 
+  max-width: 800px; 
+  margin: 0 auto; 
+  background: #fff; 
+  padding: 40px; 
+  border-radius: 16px; 
+  box-shadow: 0 4px 20px rgba(0,0,0,0.05); 
+}
+.conv-header { margin-bottom: 40px; border-bottom: 1px solid #eaeaea; padding-bottom: 20px; text-align: center; }
+.conv-title { font-size: 24px; font-weight: 700; color: #1a1a1a; margin-bottom: 8px; }
+.conv-date { font-size: 13px; color: #888; }
+.message { margin: 24px 0; display: flex; flex-direction: column; }
+.role-label { font-size: 13px; font-weight: 600; margin-bottom: 8px; color: #555; display: flex; align-items: center; gap: 6px; }
+.message-user { align-items: flex-end; }
+.message-user .role-label { align-self: flex-end; color: #1a73e8; }
+.message-gemini { align-items: flex-start; }
+.message-gemini .role-label { color: #d93025; }
+.message-content { 
+  padding: 16px 20px; 
+  border-radius: 16px; 
+  max-width: 85%;
+  word-wrap: break-word;
+}
+.message-user .message-content {
+  background: #f0f4f9;
+  color: #202124;
+  border-bottom-right-radius: 4px;
+}
+.message-gemini .message-content {
+  background: #ffffff;
+  color: #202124;
+  border: 1px solid #e0e0e0;
+  border-bottom-left-radius: 4px;
+}
+.message-content p { margin-bottom: 12px; }
+.message-content p:last-child { margin-bottom: 0; }
+h2, h3, h4 { margin: 24px 0 12px; font-weight: 600; color: #202124; }
+h2 { font-size: 20px; } h3 { font-size: 18px; }
+pre { background: #f8f9fa; padding: 16px; border-radius: 8px; overflow-x: auto; font-size: 13px; margin: 16px 0; border: 1px solid #e8eaed; }
+code { font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; font-size: 13px; background: #f1f3f4; padding: 2px 6px; border-radius: 4px; }
+pre code { background: none; padding: 0; }
+blockquote { border-left: 4px solid #dadce0; padding-left: 16px; margin: 16px 0; color: #5f6368; font-style: italic; }
+table { border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 14px; }
+th, td { border: 1px solid #dadce0; padding: 10px 14px; text-align: left; }
+th { background: #f8f9fa; font-weight: 600; }
+ul, ol { padding-left: 24px; margin: 12px 0; }
+li { margin-bottom: 6px; }
+a { color: #1a73e8; text-decoration: none; }
+a:hover { text-decoration: underline; }
+.image-container { margin: 16px 0; text-align: center; }
+.image-container img { max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+.user-images { margin: 12px 0; text-align: right; }
+.user-images img { max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+.truncated { color: #80868b; font-style: italic; }
 </style>
 </head>
 <body>
@@ -1873,46 +1945,7 @@ ${conversationsHtml}
 </html>`;
   }
 
-  function generatePdfBlob(htmlString) {
-    return new Promise((resolve, reject) => {
-      if (typeof html2pdf === 'undefined') {
-        reject(new Error("html2pdf library is not loaded."));
-        return;
-      }
 
-      const iframe = document.createElement('iframe');
-      iframe.style.position = 'absolute';
-      iframe.style.width = '800px';
-      iframe.style.height = '600px';
-      iframe.style.left = '-9999px';
-      document.body.appendChild(iframe);
-      
-      const doc = iframe.contentWindow.document;
-      doc.open();
-      doc.write(htmlString);
-      doc.close();
-
-      const opt = {
-        margin:       10,
-        filename:     'export.pdf',
-        image:        { type: 'jpeg', quality: 0.98 },
-        html2canvas:  { scale: 2, useCORS: true, logging: false },
-        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
-      };
-
-      const contentEl = doc.querySelector('.content') || doc.body;
-
-      html2pdf().set(opt).from(contentEl).output('blob')
-        .then(blob => {
-          document.body.removeChild(iframe);
-          resolve(blob);
-        })
-        .catch(err => {
-          document.body.removeChild(iframe);
-          reject(err);
-        });
-    });
-  }
 
   async function handleBulkExport() {
     const btnExport = actionBar.querySelector('.gemling-btn-export');
@@ -1950,29 +1983,21 @@ ${conversationsHtml}
           safeTitle = `conversation_${convId}`;
         }
         
-        let filename = `${safeTitle}.pdf`;
+        let filename = `${safeTitle}.html`;
         let counter = 1;
         while (zip.files.some(f => f.name.toLowerCase() === filename.toLowerCase())) {
-          filename = `${safeTitle}_${counter}.pdf`;
+          filename = `${safeTitle}_${counter}.html`;
           counter++;
         }
 
-        // Add images as separate files in the ZIP first, so we don't lose them if PDF generation fails
-        if (fetchedImages && fetchedImages.length > 0) {
-          for (const img of fetchedImages) {
-            zip.addFile(img.filename, img.base64, true);
-          }
-        }
-
         const htmlStr = buildSinglePdfHtml({ title, markdown, date: dateStr, images: fetchedImages });
-        const pdfBlob = await generatePdfBlob(htmlStr);
         
-        const base64 = await blobToBase64(pdfBlob);
-        zip.addFile(filename, base64, true);
+        // Embed the HTML into the zip directly
+        zip.addFile(filename, htmlStr, false);
 
         successCount++;
       } catch (err) {
-        console.error('[Gemling] PDF导出失败:', convId, err);
+        console.error('[Gemling] HTML导出失败:', convId, err);
         failCount++;
       }
 
@@ -1988,7 +2013,7 @@ ${conversationsHtml}
         const hh = String(now.getHours()).padStart(2, '0');
         const min = String(now.getMinutes()).padStart(2, '0');
         const ss = String(now.getSeconds()).padStart(2, '0');
-        const zipFilename = `gemini_pdfs_${yyyy}${mm}${dd}_${hh}${min}${ss}.zip`;
+        const zipFilename = `gemini_exports_${yyyy}${mm}${dd}_${hh}${min}${ss}.zip`;
         
         downloadBlob(zipBlob, zipFilename);
       } catch (zipErr) {
@@ -2024,6 +2049,9 @@ ${conversationsHtml}
         clearInterval(interval);
         
         try {
+          // Scroll and wait for DOM settling to ensure all lazy-loaded elements are inserted
+          await scrollAndSettleDOM();
+
           // Wait for all images to finish loading before extracting
           const allImgs = document.querySelectorAll('message-content img, user-query img');
           if (allImgs.length > 0) {

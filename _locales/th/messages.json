@@ -6,7 +6,7 @@
     "message": "จัดการการสนทนา Google Gemini แบบชุด เช่น การย้ายหลายแชทไปยังสมุดบันทึกในคลิกเดียว"
   },
   "actionAdd": {
-    "message": "เพิ่มไปยังสมุดบันทึก"
+    "message": "ย้าย"
   },
   "actionSelect": {
     "message": "โปรดเลือกสมุดบันทึก..."
@@ -56,6 +56,15 @@
     "message": "Cancel"
   },
   "actionExport": {
-    "message": "ส่งออก PDF"
+    "message": "ส่งออก HTML"
+  },
+  "tooltipAdd": {
+    "message": "ย้ายไปยังสมุดบันทึกที่ระบุ"
+  },
+  "tooltipExport": {
+    "message": "ส่งออกเป็นไฟล์ HTML"
+  },
+  "tooltipDelete": {
+    "message": "ไม่สามารถกู้คืนได้หลังจากลบ โปรดดำเนินการด้วยความระมัดระวัง"
   }
 }
