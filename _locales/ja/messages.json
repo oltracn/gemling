@@ -66,5 +66,8 @@
   },
   "tooltipDelete": {
     "message": "削除後は元に戻せません。慎重に操作してください。"
+  },
+  "countMaxSelected": {
+    "message": "最大10アイテムが選択されました"
   }
 }

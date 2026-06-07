@@ -66,5 +66,8 @@
   },
   "tooltipDelete": {
     "message": "删除后无法恢复，请谨慎操作"
+  },
+  "countMaxSelected": {
+    "message": "最多选中 10 项"
   }
 }

@@ -62,9 +62,12 @@
     "message": "Move to a specific notebook"
   },
   "tooltipExport": {
-    "message": "Export as a HTML file"
+    "message": "Export as an HTML file"
   },
   "tooltipDelete": {
     "message": "Cannot be recovered after deletion. Please proceed with caution."
+  },
+  "countMaxSelected": {
+    "message": "Maximum 10 items selected"
   }
 }

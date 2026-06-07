@@ -66,5 +66,8 @@
   },
   "tooltipDelete": {
     "message": "Kann nach dem Löschen nicht wiederhergestellt werden. Bitte mit Vorsicht fortfahren."
+  },
+  "countMaxSelected": {
+    "message": "Maximal 10 Elemente ausgewählt"
   }
 }

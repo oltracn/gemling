@@ -66,5 +66,8 @@
   },
   "tooltipDelete": {
     "message": "Impossible de récupérer après suppression. Veuillez procéder avec prudence."
+  },
+  "countMaxSelected": {
+    "message": "Maximum 10 éléments sélectionnés"
   }
 }

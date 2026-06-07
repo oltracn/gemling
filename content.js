@@ -284,10 +284,23 @@
     const countBadge = actionBar.querySelector('#gemlingSelectedCountBadge');
     if (countBadge) {
       countBadge.textContent = count.toString();
+      if (count >= 10) {
+        countBadge.style.backgroundColor = '#fff3e0';
+        countBadge.style.color = '#e65100';
+      } else {
+        countBadge.style.backgroundColor = '';
+        countBadge.style.color = '';
+      }
     }
     const countEl = actionBar.querySelector('.gemling-count-text');
     if (countEl) {
-      countEl.textContent = chrome.i18n.getMessage("countSelected", [count.toString()]);
+      if (count >= 10) {
+        countEl.textContent = chrome.i18n.getMessage("countMaxSelected") || "最多选中 10 项";
+        countEl.style.color = '#e65100';
+      } else {
+        countEl.textContent = chrome.i18n.getMessage("countSelected", [count.toString()]);
+        countEl.style.color = '';
+      }
     }
 
     if (count > 0) {
@@ -427,6 +440,12 @@
       e.preventDefault();
 
       const isChecked = checkbox.dataset.checked === 'true';
+
+      if (!isChecked && checkedConversationIds.size >= 10) {
+        // Prevent selecting more than 10 items
+        return;
+      }
+
       checkbox.dataset.checked = isChecked ? 'false' : 'true';
 
       if (!isChecked) {
@@ -434,8 +453,6 @@
       } else {
         checkedConversationIds.delete(convId);
       }
-
-      // Removed button state resetting as it's now handled by the dedicated finish action view
 
       updateCount();
     });

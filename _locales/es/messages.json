@@ -66,5 +66,8 @@
   },
   "tooltipDelete": {
     "message": "No se puede recuperar después de la eliminación. Por favor proceda con precaución."
+  },
+  "countMaxSelected": {
+    "message": "Máximo 10 elementos seleccionados"
   }
 }
