@@ -6,7 +6,7 @@
     "message": "Batch manage Google Gemini conversations, including moving multiple chats to a notebook with one click."
   },
   "actionAdd": {
-    "message": "Add to Notebook"
+    "message": "Add"
   },
   "actionSelect": {
     "message": "Please select notebook..."
@@ -56,6 +56,6 @@
     "message": "Cancel"
   },
   "actionExport": {
-    "message": "Export PDF"
+    "message": "Export"
   }
 }

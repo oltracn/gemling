@@ -6,7 +6,7 @@
     "message": "批量管理 Google Gemini 对话，支持一键将多个对话移动到笔记本。"
   },
   "actionAdd": {
-    "message": "添加到笔记本"
+    "message": "添加"
   },
   "actionSelect": {
     "message": "请选择笔记本..."
@@ -56,6 +56,6 @@
     "message": "取消"
   },
   "actionExport": {
-    "message": "导出 PDF"
+    "message": "导出"
   }
 }
